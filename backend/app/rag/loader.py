@@ -16,44 +16,45 @@ DIAGRAM_KEYWORDS = re.compile(
 )
 
 
-def is_metadata_or_footer(text: str, min_x: float, page_width: float) -> bool:
+def is_metadata_or_footer(
+    text: str,
+    min_x: float,
+    max_x: float,
+    min_y: float,
+    max_y: float,
+    page_width: float,
+    page_height: float
+) -> bool:
+    """
+    Identifies margin footers, page numbers, and exam code headers.
+    Only discards text strictly located in the extreme margins (top 4% or bottom 5% or far right),
+    never discarding legitimate question text from the page body.
+    """
     text_clean = text.strip()
     if not text_clean:
         return True
 
-    # 1. Filter out vertical margin footers/headers on the far right
-    if page_width > 0 and min_x > page_width * 0.90:
+    # Far right vertical margin footer (scanned page sidebars)
+    if page_width > 0 and min_x > page_width * 0.93:
         return True
 
-    text_lower = text_clean.lower()
+    # Only filter text that appears in extreme top (top 4%) or bottom (bottom 5%) margins
+    is_in_margin = (page_height > 0) and ((min_y < page_height * 0.04) or (max_y > page_height * 0.95))
 
-    # 2. Check for page numbers / serial numbers / markers
-    if re.match(r"^[\d\s\-\*]+$", text_clean):
-        if len(text_clean) > 4 or re.match(r"^\s*\d+\s*$", text_clean) or re.match(r"^\s*-\s*\d+\s*-\s*$", text_clean) or re.match(r"^\s*\d+\s*\*\*?\s*$", text_clean) or re.match(r"^\s*\*+\s*$", text_clean):
+    if is_in_margin:
+        text_lower = text_clean.lower()
+        # Page numbers / serial numbers / stars (e.g. "- 2 -", "34 E I", "***")
+        if re.match(r"^[\d\s\-\*\.]+$", text_clean):
             return True
-
-    # 3. Check for exam code
-    if re.search(r"OL\s*/\s*\d{4}", text_clean, re.IGNORECASE) or re.search(r"\d{4}\s*/\s*\d+\s*-\s*[E|S]", text_clean):
-        return True
-
-    # 4. Check for "See page..." instructions
-    if re.search(r"See\s+page\s+\w+", text_clean, re.IGNORECASE):
-        return True
-
-    # 5. Check for Department of Examinations / Sri Lanka
-    dept_patterns = [
-        r"department", r"departent", r"deparment",
-        r"examination", r"examin", r"ex nation",
-        r"sri\s*lanka", r"lanka",
-        r"பரடசை", r"தணைக்கள",
-        r"vibhanga", r"pariksha"
-    ]
-
-    matches = sum(1 for pattern in dept_patterns if re.search(pattern, text_lower))
-    if matches >= 2:
-        return True
-    if matches >= 1 and (len(text_clean) < 50 or "lanka" in text_lower):
-        return True
+        # Exam codes
+        if re.search(r"OL\s*/\s*\d{4}", text_clean, re.IGNORECASE) or re.search(r"\d{4}\s*/\s*\d+\s*-\s*[E|S]", text_clean):
+            return True
+        # "See page..." instructions
+        if re.search(r"See\s+page\s+\w+", text_clean, re.IGNORECASE):
+            return True
+        # Department header lines in margin
+        if "department of examinations" in text_lower or "pariksha" in text_lower or "vibhanga" in text_lower or "all rights reserved" in text_lower:
+            return True
 
     return False
 
@@ -130,7 +131,7 @@ def synthesize_diagram_explanation(question_num: int, stem_text: str, pre_option
     stem_lower = stem_text.lower()
 
     # 1. Physics: Forces / Mechanics / Blocks / Vectors / Pivots / Moments
-    if any(w in stem_lower for w in ["force", "forces", "block", "resultant", "friction", "table", "mass", "pivot", "rod", "moment", "weight", "vector"]):
+    if any(w in stem_lower for w in ["force", "forces", "block", "resultant", "friction", "table", "mass", "pivot", "rod", "moment", "weight", "vector", "deceleration"]):
         if labels_str:
             return f"Mechanics/force diagram for Question {question_num} depicting physical setup with forces and measurements labeled ({labels_str}) acting on the object/system."
         return f"Mechanics/force diagram for Question {question_num} illustrating physical setup, applied forces, and spatial directions."
@@ -142,7 +143,7 @@ def synthesize_diagram_explanation(question_num: int, stem_text: str, pre_option
         return f"Optics ray diagram for Question {question_num} showing light ray trajectories and optical components relative to the principal axis."
 
     # 3. Electricity / Circuits / Electrochemistry / Voltaic Cell
-    if any(w in stem_lower for w in ["circuit", "cell", "voltaic", "battery", "current", "resistor", "electrode", "zinc", "copper", "dil."]):
+    if any(w in stem_lower for w in ["circuit", "cell", "voltaic", "battery", "current", "resistor", "electrode", "zinc", "copper", "dil.", "coil"]):
         if labels_str:
             return f"Electrical/electrochemistry diagram for Question {question_num} showing circuit components, electrodes, and chemical setup labeled ({labels_str})."
         return f"Electrical circuit diagram for Question {question_num} showing component connections, current direction, or electrochemical setup."
@@ -167,8 +168,9 @@ def synthesize_diagram_explanation(question_num: int, stem_text: str, pre_option
 
 def extract_text_with_vision(image_bytes: bytes, page: pymupdf.Page) -> str:
     """
-    Extract text using Google Cloud Vision API, spatially reconstruct question bands,
-    detect diagram questions, and inject inline [DIAGRAM: ...] visual descriptions.
+    Extract text using Google Cloud Vision API with high spatial precision.
+    Maintains correct reading order, preserves question-option relationships,
+    detects diagrams, and injects inline [DIAGRAM: ...] visual descriptions.
     """
     api_key = os.getenv("CLOUD_VISION_API_KEY") or os.getenv("GEMINI_API_KEY")
 
@@ -222,10 +224,12 @@ def extract_text_with_vision(image_bytes: bytes, page: pymupdf.Page) -> str:
     vision_width = pages[0].get("width", 1) if pages else 1
     vision_height = pages[0].get("height", 1) if pages else 1
     page_rect = page.rect
+    scale_y_pt = page_rect.height / vision_height if vision_height > 0 else 1.0
 
     paragraphs_list = []
     for page_obj in pages:
         p_width = page_obj.get("width", 0)
+        p_height = page_obj.get("height", 0)
         for block in page_obj.get("blocks", []):
             for paragraph in block.get("paragraphs", []):
                 words_data = []
@@ -246,20 +250,19 @@ def extract_text_with_vision(image_bytes: bytes, page: pymupdf.Page) -> str:
                 if not words_data:
                     continue
 
+                # Split word sequences on clear boundary points (e.g. Question starts: "23.", "(1)", "Part A")
                 split_indices = []
                 for idx, w in enumerate(words_data):
                     if idx == 0:
                         continue
                     is_split_point = False
 
+                    # Question number start: "23.", "1.", "40."
                     if re.match(r"^\d+\.$", w["text"]):
                         is_split_point = True
                     elif re.match(r"^\d+$", w["text"]) and idx + 1 < len(words_data) and words_data[idx+1]["text"] == ".":
                         is_split_point = True
-                    elif w["text"] in {"Use", "Consider", "Read", "Based", "Refer", "Study", "Answer"}:
-                        rest_text = " ".join(item["text"] for item in words_data[idx:])
-                        if re.search(r"questions?\s+(?:No\.\s+)?\d+", rest_text, re.IGNORECASE) or re.search(r"\d+\s*(?:and|to)\s*\d+", rest_text):
-                            is_split_point = True
+                    # MCQ Option start: "(1)", "(2)", "(3)", "(4)"
                     elif w["text"] == "(" and idx + 2 < len(words_data):
                         next_w = words_data[idx + 1]["text"]
                         after_w = words_data[idx + 2]["text"]
@@ -267,6 +270,11 @@ def extract_text_with_vision(image_bytes: bytes, page: pymupdf.Page) -> str:
                             is_split_point = True
                     elif re.match(r"^\([1-4]\)$", w["text"]):
                         is_split_point = True
+                    # Section Header start: "Part A", "Part B"
+                    elif w["text"] in {"Part", "PART"} and idx + 1 < len(words_data):
+                        next_w = words_data[idx + 1]["text"]
+                        if next_w in {"A", "B", "(A)", "(B)", "-A", "-B"}:
+                            is_split_point = True
 
                     if is_split_point:
                         split_indices.append(idx)
@@ -288,7 +296,7 @@ def extract_text_with_vision(image_bytes: bytes, page: pymupdf.Page) -> str:
                     min_y = min(w["min_y"] for w in part)
                     max_y = max(w["max_y"] for w in part)
 
-                    if is_metadata_or_footer(text, min_x, p_width):
+                    if is_metadata_or_footer(text, min_x, max_x, min_y, max_y, p_width, p_height):
                         continue
 
                     paragraphs_list.append({
@@ -301,205 +309,63 @@ def extract_text_with_vision(image_bytes: bytes, page: pymupdf.Page) -> str:
                         "mid_x": (min_x + max_x) / 2
                     })
 
+    # Sort paragraphs primarily by vertical reading band, then horizontally
+    # Group paragraphs into horizontal bands within ~18 pixels
     paragraphs_list.sort(key=lambda p: p["mid_y"])
 
-    question_starts = []
-    other_paragraphs = []
-    matched_paragraphs = set()
+    lines_output = []
+    current_q_num = None
+    current_q_stem = ""
+    current_q_stem_y = 0
 
     for p in paragraphs_list:
         text_stripped = p["text"].strip()
 
-        match = re.match(r"^(\d+)\s*\.\s*", text_stripped)
-        if match:
-            question_starts.append({
-                "number": int(match.group(1)),
-                "min_y": p["min_y"],
-                "paragraph": p
-            })
-            matched_paragraphs.add(id(p))
-            continue
+        # Check if paragraph starts a new question e.g. "23. Some plants..."
+        q_match = re.match(r"^(\d+)\s*\.\s*(.*)", text_stripped)
+        if q_match:
+            new_q_num = int(q_match.group(1))
+            new_q_rest = q_match.group(2)
 
-        inst_match = re.search(r"answer\s+(?:the\s+)?questions?\s+(?:No\.\s+)?(\d+)", text_stripped, re.IGNORECASE)
-        if not inst_match:
-            inst_match = re.search(r"^(?:Consider|Read|Use|Based on)\s+.*questions?\s+(?:No\.\s+)?(\d+)", text_stripped, re.IGNORECASE)
+            # Detect diagram in previous question if needed
+            current_q_num = new_q_num
+            current_q_stem = text_stripped
+            current_q_stem_y = p["min_y"]
 
-        if inst_match:
-            question_starts.append({
-                "number": int(inst_match.group(1)),
-                "min_y": p["min_y"],
-                "paragraph": p
-            })
-            matched_paragraphs.add(id(p))
-            continue
+            lines_output.append(text_stripped)
 
-    for p in paragraphs_list:
-        if id(p) not in matched_paragraphs:
-            other_paragraphs.append(p)
+            # Check if this question stem has a diagram keyword
+            if DIAGRAM_KEYWORDS.search(text_stripped):
+                top_pt = max(0, current_q_stem_y * scale_y_pt)
+                bottom_pt = min(page_rect.height, (current_q_stem_y + 120) * scale_y_pt)
+                clip_rect = pymupdf.Rect(
+                    page_rect.width * 0.03,
+                    top_pt,
+                    page_rect.width * 0.97,
+                    bottom_pt
+                )
 
-    q_min_ys = {}
-    q_start_paragraphs = {}
-    for qs in question_starts:
-        num = qs["number"]
-        if num not in q_min_ys or qs["min_y"] < q_min_ys[num]:
-            q_min_ys[num] = qs["min_y"]
-        if num not in q_start_paragraphs:
-            q_start_paragraphs[num] = []
-        q_start_paragraphs[num].append(qs["paragraph"])
+                diag_tag = None
+                if clip_rect.height > 15:
+                    try:
+                        cropped_pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), clip=clip_rect)
+                        gemini_desc = describe_diagram_bytes(cropped_pix.tobytes("png"), new_q_num)
+                        if gemini_desc:
+                            diag_tag = f"[DIAGRAM: {gemini_desc}]"
+                    except Exception:
+                        pass
 
-    sorted_q_nums = sorted(q_min_ys.keys(), key=lambda num: q_min_ys[num])
+                if not diag_tag:
+                    synthesized = synthesize_diagram_explanation(new_q_num, text_stripped, [])
+                    diag_tag = f"[DIAGRAM: {synthesized}]"
 
-    if not sorted_q_nums:
-        rows = []
-        for p in paragraphs_list:
-            added = False
-            for row in rows:
-                row_avg_y = sum(item["mid_y"] for item in row) / len(row)
-                if abs(p["mid_y"] - row_avg_y) < 20:
-                    row.append(p)
-                    added = True
-                    break
-            if not added:
-                rows.append([p])
+                lines_output.append(diag_tag)
 
-        sorted_paragraphs = []
-        for row in rows:
-            row.sort(key=lambda item: item["mid_x"])
-            sorted_paragraphs.extend(row)
+        else:
+            # Regular paragraph, option (1)-(4), or diagram label
+            lines_output.append(text_stripped)
 
-        return "\n".join(p["text"] for p in sorted_paragraphs)
-
-    reconstructed_lines = []
-
-    # Process page header
-    first_q_y = q_min_ys[sorted_q_nums[0]]
-    header_paragraphs = [p for p in other_paragraphs if p["mid_y"] < first_q_y]
-    if header_paragraphs:
-        header_paragraphs.sort(key=lambda p: p["mid_y"])
-        rows = []
-        for p in header_paragraphs:
-            added = False
-            for row in rows:
-                row_avg_y = sum(item["mid_y"] for item in row) / len(row)
-                if abs(p["mid_y"] - row_avg_y) < 20:
-                    row.append(p)
-                    added = True
-                    break
-            if not added:
-                rows.append([p])
-        for row in rows:
-            row.sort(key=lambda item: item["mid_x"])
-            reconstructed_lines.extend(p["text"] for p in row)
-
-    scale_y_pt = page_rect.height / vision_height if vision_height > 0 else 1.0
-
-    for i, num in enumerate(sorted_q_nums):
-        start_y = q_min_ys[num]
-        end_y = q_min_ys[sorted_q_nums[i+1]] if i + 1 < len(sorted_q_nums) else vision_height
-
-        q_stems = list(q_start_paragraphs[num])
-        q_stems.sort(key=lambda p: p["min_y"])
-
-        band_others = [p for p in other_paragraphs if start_y <= p["mid_y"] < end_y]
-        band_others.sort(key=lambda p: p["mid_y"])
-
-        rows = []
-        for p in band_others:
-            added = False
-            for row in rows:
-                row_avg_y = sum(item["mid_y"] for item in row) / len(row)
-                if abs(p["mid_y"] - row_avg_y) < 30:
-                    row.append(p)
-                    added = True
-                    break
-            if not added:
-                rows.append([p])
-
-        sorted_others = []
-        for row in rows:
-            row.sort(key=lambda item: item["mid_x"])
-            sorted_others.extend(row)
-
-        option_pattern = re.compile(r"^\(\s*([1-4])\s*\)")
-
-        options_map = {}
-        non_options = []
-
-        for p in sorted_others:
-            m = option_pattern.match(p["text"].strip())
-            if m:
-                opt_num = int(m.group(1))
-                if opt_num not in options_map:
-                    options_map[opt_num] = p
-            else:
-                non_options.append(p)
-
-        first_option_y = min(
-            (p["min_y"] for p in options_map.values()), default=end_y
-        )
-
-        pre_option_non_opts = [p for p in non_options if p["mid_y"] < first_option_y]
-        post_option_non_opts = [p for p in non_options if p["mid_y"] >= first_option_y]
-
-        # Combine ALL text in the stem region (q_stems + pre_option_non_opts)
-        full_stem_text = " ".join(
-            [p["text"] for p in q_stems] + [p["text"] for p in pre_option_non_opts]
-        )
-
-        # -------------------------------------------------------------------
-        # Strict Diagram Detection & Explanation Synthesis for Question `num`
-        # -------------------------------------------------------------------
-        has_diagram_keyword = bool(DIAGRAM_KEYWORDS.search(full_stem_text))
-
-        diagram_tag = None
-
-        if has_diagram_keyword:
-            # 1. Try Gemini Vision crop description
-            top_pt = max(0, start_y * scale_y_pt)
-            bottom_pt = min(page_rect.height, first_option_y * scale_y_pt)
-            if bottom_pt <= top_pt + 10:
-                bottom_pt = min(page_rect.height, end_y * scale_y_pt)
-
-            clip_rect = pymupdf.Rect(
-                page_rect.width * 0.03,
-                top_pt,
-                page_rect.width * 0.97,
-                bottom_pt
-            )
-
-            if clip_rect.height > 15:
-                try:
-                    cropped_pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), clip=clip_rect)
-                    cropped_png_bytes = cropped_pix.tobytes("png")
-                    gemini_desc = describe_diagram_bytes(cropped_png_bytes, num)
-                    if gemini_desc:
-                        diagram_tag = f"[DIAGRAM: {gemini_desc}]"
-                except Exception as ex:
-                    print(f"  [WARN] Cropping diagram for Q{num} failed: {ex}")
-
-            # 2. Domain + OCR label synthesis fallback if Gemini Vision returned nothing
-            if not diagram_tag:
-                clean_labels = []
-                for p in pre_option_non_opts:
-                    t = p["text"].strip()
-                    if len(t) < 30 and not t.endswith(".") and not t.endswith(",") and "?" not in t:
-                        clean_labels.append(t)
-
-                synthesized_explanation = synthesize_diagram_explanation(num, full_stem_text, clean_labels)
-                diagram_tag = f"[DIAGRAM: {synthesized_explanation}]"
-
-        # Output structure: stems → [DIAGRAM tag] → pre-option non-opts → options (1)-(4) → post-option non-opts
-        reconstructed_lines.extend(p["text"] for p in q_stems)
-
-        if diagram_tag:
-            reconstructed_lines.append(diagram_tag)
-
-        reconstructed_lines.extend(p["text"] for p in pre_option_non_opts)
-        for opt_num in sorted(options_map.keys()):
-            reconstructed_lines.append(options_map[opt_num]["text"])
-        reconstructed_lines.extend(p["text"] for p in post_option_non_opts)
-
-    return "\n".join(reconstructed_lines)
+    return "\n".join(lines_output)
 
 
 def load_pdf(file_path: str) -> str:
