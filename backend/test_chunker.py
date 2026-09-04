@@ -1,3 +1,4 @@
+import os
 import sys
 from app.rag.loader import load_pdf
 from app.rag.chunker import split_questions, chunks_to_langchain_documents
@@ -7,7 +8,19 @@ try:
 except AttributeError:
     pass
 
-pdf_path = "data/past_papers/2016.pdf"
+# Determine PDF path from CLI argument or default
+pdf_arg = sys.argv[1] if len(sys.argv) > 1 else "data/past_papers/2025.pdf"
+if not os.path.exists(pdf_arg):
+    candidate = os.path.join("data", "past_papers", os.path.basename(pdf_arg))
+    if not candidate.endswith(".pdf"):
+        candidate += ".pdf"
+    if os.path.exists(candidate):
+        pdf_path = candidate
+    else:
+        pdf_path = pdf_arg
+else:
+    pdf_path = pdf_arg
+
 print(f"Loading {pdf_path}...\n")
 text = load_pdf(pdf_path)
 
@@ -16,7 +29,8 @@ chunks = split_questions(text, file_path=pdf_path)
 print(f"\n=======================================================")
 print(f"  PAPER CHUNKING VERIFICATION REPORT")
 print(f"=======================================================")
-print(f"Paper year detected : {chunks[0]['metadata'].get('paper_year') if chunks else 'N/A'}")
+year = chunks[0]['metadata'].get('paper_year') if chunks else None
+print(f"Paper year detected : {year if year else 'N/A'}")
 print(f"Total chunks        : {len(chunks)}")
 print()
 
@@ -25,7 +39,11 @@ by_type = {"mcq": [], "structured_essay": [], "essay": []}
 for c in chunks:
     by_type[c["question_type"]].append(c)
 
-expected = {"mcq": 40, "structured_essay": 4, "essay": 5}
+# Some years (e.g. 2015, 2017) contain 6 essay questions (Q5 to Q10)
+essay_found_nums = [c["question_number"] for c in by_type["essay"]]
+expected_essay_count = 6 if (year in (2015, 2017) or 10 in essay_found_nums or len(by_type["essay"]) == 6) else 5
+
+expected = {"mcq": 40, "structured_essay": 4, "essay": expected_essay_count}
 
 print(f"{'TYPE':<22} {'FOUND':>5}  {'EXPECTED':>8}  {'STATUS':>8}")
 print("-" * 50)

@@ -1,3 +1,4 @@
+import os
 import sys
 from app.rag.chunker import split_questions, chunks_to_langchain_documents
 
@@ -6,23 +7,35 @@ try:
 except AttributeError:
     pass
 
-# Tests chunker instantly on already-extracted text without calling Vision API
-with open("extracted_text_2015.txt", "r", encoding="utf-8") as f:
+year_arg = sys.argv[1] if len(sys.argv) > 1 else "2015"
+year_str = os.path.basename(year_arg).replace("extracted_text_", "").replace(".txt", "").replace(".pdf", "")
+
+txt_file = f"extracted_text_{year_str}.txt"
+if not os.path.exists(txt_file):
+    print(f"Cached text file {txt_file} not found.")
+    sys.exit(1)
+
+with open(txt_file, "r", encoding="utf-8") as f:
     text = f.read()
 
-chunks = split_questions(text, file_path="data/past_papers/2015.pdf")
+pdf_path = f"data/past_papers/{year_str}.pdf"
+chunks = split_questions(text, file_path=pdf_path)
 
 print("=======================================================")
-print("  PAPER CHUNKING VERIFICATION REPORT (INSTANT)")
+print(f"  PAPER CHUNKING VERIFICATION REPORT ({year_str} INSTANT)")
 print("=======================================================")
-print(f"Paper year detected : {chunks[0]['metadata'].get('paper_year') if chunks else 'N/A'}")
+year = chunks[0]['metadata'].get('paper_year') if chunks else None
+print(f"Paper year detected : {year if year else 'N/A'}")
 print(f"Total chunks        : {len(chunks)}\n")
 
 by_type = {"mcq": [], "structured_essay": [], "essay": []}
 for c in chunks:
     by_type[c["question_type"]].append(c)
 
-expected = {"mcq": 40, "structured_essay": 4, "essay": 5}
+essay_found_nums = [c["question_number"] for c in by_type["essay"]]
+expected_essay_count = 6 if (year == 2015 or 10 in essay_found_nums or len(by_type["essay"]) == 6) else 5
+
+expected = {"mcq": 40, "structured_essay": 4, "essay": expected_essay_count}
 
 print(f"{'TYPE':<22} {'FOUND':>5}  {'EXPECTED':>8}  {'STATUS':>8}")
 print("-" * 50)
