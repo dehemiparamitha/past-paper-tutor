@@ -4,6 +4,7 @@ python-dotenv
 pymupdf
 langchain
 langchain-community
+langchain-huggingface
 langchain-text-splitters
 langchain-chroma
 langchain-google-genai
