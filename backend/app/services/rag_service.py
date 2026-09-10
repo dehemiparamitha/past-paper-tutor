@@ -3,6 +3,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from app.rag.retriever import get_retriever
+from app.rag.vectorstore import get_vectorstore
 
 load_dotenv()   
 
@@ -51,3 +52,26 @@ rag_chain = (
 def ask_question(question: str):
     response = rag_chain.invoke(question)
     return response.content
+
+
+def find_similar_questions(query: str, limit: int = 10) -> list[dict]:
+    """Return the closest indexed questions with normalized relevance scores."""
+    matches = get_vectorstore().similarity_search_with_relevance_scores(
+        query,
+        k=limit,
+    )
+
+    results = []
+    for document, relevance in matches:
+        metadata = document.metadata
+        results.append(
+            {
+                "year": metadata.get("paper_year"),
+                "question_number": metadata.get("question_number"),
+                "question_type": metadata.get("question_type"),
+                "question": document.page_content,
+                "similarity": round(max(0.0, min(1.0, relevance)), 2),
+            }
+        )
+
+    return results
