@@ -140,6 +140,27 @@ h1 {
 .message p { color: #bac4d0; font-size: 17px; line-height: 1.75; margin: 0; }
 .user p { display: inline-block; color: #d4e2f6; background: #1a283c; border: 1px solid #2a4263; border-radius: 10px 3px 10px 10px; padding: 9px 12px; text-align: left; }
 
+.similar-questions {
+  margin: 30px 0 36px 38px;
+  border-top: 1px solid #29323d;
+  padding-top: 20px;
+}
+.similar-questions h2 {
+  margin: 0 0 14px;
+  color: #eef3e9;
+  font: 600 18px 'Space Grotesk', sans-serif;
+}
+.similar-question-list { display: grid; gap: 12px; }
+.similar-question {
+  border: 1px solid #29323d;
+  border-radius: 8px;
+  background: #141b23;
+  padding: 12px 14px;
+}
+.similar-question-meta { display: flex; gap: 9px; color: #8ab4ff; font-size: 12px; }
+.similar-question-meta span { color: #7d8998; }
+.similar-question p { margin-top: 5px; font-size: 14px; line-height: 1.5; }
+
 .typing { display: flex; gap: 4px; padding-top: 5px; }
 .typing i { width: 5px; height: 5px; border-radius: 50%; background: #8ab4ff; animation: blink 1s infinite; }
 .typing i:nth-child(2) { animation-delay: .15s; }

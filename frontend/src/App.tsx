@@ -1,28 +1,11 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { askTutor, findSimilarQuestions } from './services/api'
+import { isQuestionSearchRequest } from './services/intent'
+import type { Message, SimilarQuestion } from './types/api'
+import { Mark } from './components/Mark'
+import { SimilarQuestions } from './components/SimilarQuestions'
 import './App.css'
-
-type Message = {
-  id: number
-  role: 'user' | 'assistant'
-  content: string
-}
-
-function getAnswer(payload: unknown): string {
-  if (typeof payload === 'string') return payload
-  if (Array.isArray(payload)) {
-    return payload
-      .map((item) => getAnswer(item))
-      .filter(Boolean)
-      .join('\n\n')
-  }
-  if (!payload || typeof payload !== 'object') return ''
-
-  const data = payload as Record<string, unknown>
-  const answer = data.answer ?? data.content ?? data.response ?? data.result ?? data.output ?? data.text
-  if (typeof answer === 'object') return getAnswer(answer)
-  return typeof answer === 'string' ? answer : ''
-}
 
 const exampleQuestions = [
   'Explain a concept from the past papers',
@@ -30,18 +13,11 @@ const exampleQuestions = [
   'Give me an exam-style explanation',
 ]
 
-function Mark() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 2.8 14 10l7.2 2-7.2 2-2 7.2-2-7.2-7.2-2 7.2-2L12 2.8Z" />
-    </svg>
-  )
-}
-
 function App() {
   const [messages, setMessages] = useState<Message[]>([])
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [similarQuestions, setSimilarQuestions] = useState<SimilarQuestion[]>([])
   const [error, setError] = useState('')
 
   const askQuestion = async (event?: FormEvent) => {
@@ -52,18 +28,22 @@ function App() {
     setMessages((current) => [...current, { id: Date.now(), role: 'user', content: value }])
     setQuestion('')
     setError('')
+    setSimilarQuestions([])
     setIsLoading(true)
 
+    if (isQuestionSearchRequest(value)) {
+      try {
+        setSimilarQuestions(await findSimilarQuestions(value))
+      } catch {
+        setError('The tutor could not find similar questions. Check that the backend is running and try again.')
+      } finally {
+        setIsLoading(false)
+      }
+      return
+    }
+
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL ?? 'http://localhost:8000'}/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: value }),
-      })
-      if (!response.ok) throw new Error('Request failed')
-      const result: unknown = await response.json()
-      const answer = getAnswer(result)
-      if (!answer) throw new Error('The API returned no answer text.')
+      const answer = await askTutor(value)
       setMessages((current) => [
         ...current,
         {
@@ -72,6 +52,7 @@ function App() {
           content: answer,
         },
       ])
+
     } catch {
       setError('The tutor could not answer. Check that the backend is running and VITE_API_URL points to the correct port.')
     } finally {
@@ -114,6 +95,7 @@ function App() {
               </div>
             </div>
           )}
+          <SimilarQuestions questions={similarQuestions} />
         </div>
 
         {messages.length === 0 && (
