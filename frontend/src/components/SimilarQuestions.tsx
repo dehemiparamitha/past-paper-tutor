@@ -21,12 +21,13 @@ export function SimilarQuestions({ questions }: SimilarQuestionsProps) {
       <div className="similar-question-list">
         {questions.map((item, index) => (
           <article className="similar-question" key={`${item.year}-${item.question_number}-${index}`}>
+            <div className="similar-question-label">Question {index + 1}</div>
             <div className="similar-question-meta">
               <strong>{item.year ?? 'Unknown year'}</strong>
               {item.question_number !== null && <span>Q{item.question_number}</span>}
               <span>{formatQuestionType(item.question_type)}</span>
             </div>
-            <p>{item.question}</p>
+            <p className="similar-question-text" style={{ whiteSpace: 'pre-wrap' }}>{item.question}</p>
           </article>
         ))}
       </div>

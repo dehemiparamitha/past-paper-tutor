@@ -4,6 +4,7 @@ import { askTutor, findSimilarQuestions } from './services/api'
 import { isQuestionSearchRequest } from './services/intent'
 import type { Message, SimilarQuestion } from './types/api'
 import { Mark } from './components/Mark'
+import { ChatMessage } from './components/ChatMessage'
 import { SimilarQuestions } from './components/SimilarQuestions'
 import './App.css'
 
@@ -55,7 +56,18 @@ function App() {
 
     if (isQuestionSearchRequest(value)) {
       try {
-        setSimilarQuestions(await findSimilarQuestions(value))
+        const results = await findSimilarQuestions(value)
+        setSimilarQuestions(results)
+        if (results.length === 0) {
+          setMessages((current) => [
+            ...current,
+            {
+              id: Date.now() + 1,
+              role: 'assistant',
+              content: 'I searched the past paper database, but could not find any questions closely matching that topic. Try searching for topics like "polymers", "photosynthesis", "nitrogen cycle", "urinary system", or "forces".',
+            },
+          ])
+        }
       } catch {
         setError('The tutor could not find similar questions. Check that the backend is running and try again.')
       } finally {
@@ -93,19 +105,13 @@ function App() {
       <section className="workspace" aria-label="Past paper tutor">
         <div className="conversation" aria-live="polite">
           {messages.map((message) => (
-            <div
-              className={`message ${message.role}`}
+            <ChatMessage
               key={message.id}
+              message={message}
               ref={(element) => {
                 messageRefs.current[message.id] = element
               }}
-            >
-              {message.role === 'assistant' && <div className="avatar"><Mark /></div>}
-              <div className="message-body">
-                <span className="message-name">{message.role === 'assistant' ? 'Paperwise' : 'You'}</span>
-                <p>{message.content}</p>
-              </div>
-            </div>
+            />
           ))}
           {isLoading && (
             <div className="message assistant">
