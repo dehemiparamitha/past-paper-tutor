@@ -2,6 +2,7 @@ import { forwardRef } from 'react'
 import Markdown from 'react-markdown'
 import type { Message } from '../types/api'
 import { Mark } from './Mark'
+import { SimilarQuestions } from './SimilarQuestions'
 
 type ChatMessageProps = {
   message: Message
@@ -22,7 +23,10 @@ export const ChatMessage = forwardRef<HTMLDivElement, ChatMessageProps>(
           <span className="message-name">{isAssistant ? 'Paperwise' : 'You'}</span>
           {isAssistant ? (
             <div className="message-content">
-              <Markdown>{message.content}</Markdown>
+              {message.content && <Markdown>{message.content}</Markdown>}
+              {message.similarQuestions && message.similarQuestions.length > 0 && (
+                <SimilarQuestions questions={message.similarQuestions} />
+              )}
             </div>
           ) : (
             <p>{message.content}</p>

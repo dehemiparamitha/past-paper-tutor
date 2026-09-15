@@ -1,42 +1,125 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { askTutor, findSimilarQuestions } from './services/api'
 import { isQuestionSearchRequest } from './services/intent'
-import type { Message, SimilarQuestion } from './types/api'
+import type { ChatSession, Message } from './types/api'
 import { Mark } from './components/Mark'
 import { ChatMessage } from './components/ChatMessage'
-import { SimilarQuestions } from './components/SimilarQuestions'
 import './App.css'
 
-const exampleQuestions = [
-  'Explain a concept from the past papers',
-  'What topics appear most often?',
-  'Give me an exam-style explanation',
-]
+const STORAGE_KEY = 'paperwise_chat_sessions_v1'
+
+
+
+function getInitialSessions(): ChatSession[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as ChatSession[]
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    }
+  } catch {
+    // Fallback on error
+  }
+  const defaultId = `session_${Date.now()}`
+  return [
+    {
+      id: defaultId,
+      title: 'New chat',
+      messages: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    },
+  ]
+}
 
 function App() {
-  const [messages, setMessages] = useState<Message[]>([])
+  const [sessions, setSessions] = useState<ChatSession[]>(getInitialSessions)
+  const [activeSessionId, setActiveSessionId] = useState<string>(() => {
+    const initial = getInitialSessions()
+    return initial[0]?.id || `session_${Date.now()}`
+  })
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [similarQuestions, setSimilarQuestions] = useState<SimilarQuestion[]>([])
   const [error, setError] = useState('')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+
   const messageRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const composerRef = useRef<HTMLTextAreaElement | null>(null)
+  const conversationEndRef = useRef<HTMLDivElement | null>(null)
 
-  const conversationMessages = messages.filter((message) => message.role === 'user')
+  // Persist sessions to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
+    } catch {
+      // Storage quota or privacy mode
+    }
+  }, [sessions])
 
-  const openConversation = (messageId: number) => {
-    setIsSidebarOpen(true)
-    messageRefs.current[messageId]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+  // Get active session and its messages
+  const activeSession = sessions.find((s) => s.id === activeSessionId) || sessions[0]
+  const messages = activeSession?.messages ?? []
+
+  // Auto-scroll on new messages or loading state
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages.length, isLoading])
 
   const startNewChat = () => {
-    setMessages([])
-    setSimilarQuestions([])
+    // If the active session is already blank, just focus the composer
+    if (activeSession && activeSession.messages.length === 0) {
+      composerRef.current?.focus()
+      return
+    }
+
+    const newId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    const newSession: ChatSession = {
+      id: newId,
+      title: 'New chat',
+      messages: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }
+
+    setSessions((prev) => [newSession, ...prev])
+    setActiveSessionId(newId)
     setError('')
     setQuestion('')
     composerRef.current?.focus()
+  }
+
+  const selectSession = (sessionId: string) => {
+    setActiveSessionId(sessionId)
+    setError('')
+    setQuestion('')
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false)
+    }
+  }
+
+  const deleteSession = (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSessions((prev) => {
+      const filtered = prev.filter((s) => s.id !== sessionId)
+      if (filtered.length === 0) {
+        const fallback: ChatSession = {
+          id: `session_${Date.now()}`,
+          title: 'New chat',
+          messages: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        }
+        setActiveSessionId(fallback.id)
+        return [fallback]
+      }
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(filtered[0].id)
+      }
+      return filtered
+    })
   }
 
   const focusComposer = () => {
@@ -48,26 +131,54 @@ function App() {
     const value = question.trim()
     if (!value || isLoading) return
 
-    setMessages((current) => [...current, { id: Date.now(), role: 'user', content: value }])
+    const userMsgId = Date.now()
+    const userMessage: Message = {
+      id: userMsgId,
+      role: 'user',
+      content: value,
+      createdAt: Date.now(),
+    }
+
     setQuestion('')
     setError('')
-    setSimilarQuestions([])
     setIsLoading(true)
+
+    // Append user message and set title if this is the first message
+    setSessions((prev) =>
+      prev.map((s) => {
+        if (s.id !== activeSessionId) return s
+        const isFirst = s.messages.length === 0
+        const newTitle = isFirst ? (value.length > 28 ? value.slice(0, 28) + '...' : value) : s.title
+        return {
+          ...s,
+          title: newTitle,
+          messages: [...s.messages, userMessage],
+          updatedAt: Date.now(),
+        }
+      }),
+    )
 
     if (isQuestionSearchRequest(value)) {
       try {
         const results = await findSimilarQuestions(value)
-        setSimilarQuestions(results)
-        if (results.length === 0) {
-          setMessages((current) => [
-            ...current,
-            {
-              id: Date.now() + 1,
-              role: 'assistant',
-              content: 'I searched the past paper database, but could not find any questions closely matching that topic. Try searching for topics like "polymers", "photosynthesis", "nitrogen cycle", "urinary system", or "forces".',
-            },
-          ])
+        const assistantMsg: Message = {
+          id: Date.now() + 1,
+          role: 'assistant',
+          content:
+            results.length > 0
+              ? `I found **${results.length}** past paper question${results.length > 1 ? 's' : ''} related to this topic:`
+              : 'I searched the past paper database, but could not find any questions specifically related to that topic. Try searching for topics like "polymers", "photosynthesis", "nitrogen cycle", "urinary system", or "forces".',
+          similarQuestions: results,
+          createdAt: Date.now(),
         }
+
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === activeSessionId
+              ? { ...s, messages: [...s.messages, assistantMsg], updatedAt: Date.now() }
+              : s,
+          ),
+        )
       } catch {
         setError('The tutor could not find similar questions. Check that the backend is running and try again.')
       } finally {
@@ -78,14 +189,20 @@ function App() {
 
     try {
       const answer = await askTutor(value)
-      setMessages((current) => [
-        ...current,
-        {
-          id: Date.now() + 1,
-          role: 'assistant',
-          content: answer,
-        },
-      ])
+      const assistantMsg: Message = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: answer,
+        createdAt: Date.now(),
+      }
+
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === activeSessionId
+            ? { ...s, messages: [...s.messages, assistantMsg], updatedAt: Date.now() }
+            : s,
+        ),
+      )
     } catch {
       setError('The tutor could not answer. Check that the backend is running and VITE_API_URL points to the correct port.')
     } finally {
@@ -93,10 +210,11 @@ function App() {
     }
   }
 
+  // Filter only sessions that have at least one message or the current empty session
+  const historySessions = sessions.filter((s) => s.messages.length > 0 || s.id === activeSessionId)
+
   return (
     <main className={`page ${messages.length > 0 ? 'chat-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-
-
       <section className="hero">
         <h1>What can I help you understand?</h1>
         <p className="intro">Ask questions about your past papers and get clear, exam-focused answers.</p>
@@ -113,6 +231,7 @@ function App() {
               }}
             />
           ))}
+
           {isLoading && (
             <div className="message assistant">
               <div className="avatar"><Mark /></div>
@@ -122,20 +241,14 @@ function App() {
               </div>
             </div>
           )}
-          <SimilarQuestions questions={similarQuestions} />
+
+          <div ref={conversationEndRef} style={{ height: 1 }} />
         </div>
 
-        {messages.length === 0 && (
-          <div className="examples">
-            <div className="example-list">
-              {exampleQuestions.map((example) => (
-                <button key={example} onClick={() => setQuestion(example)}>{example}<span>↗</span></button>
-              ))}
-            </div>
-          </div>
-        )}
+
 
         {error && <p className="error">{error}</p>}
+
         <form className="composer" onSubmit={askQuestion}>
           <textarea
             ref={composerRef}
@@ -151,9 +264,11 @@ function App() {
             aria-label="Ask about a past paper"
             rows={1}
           />
-          <button type="submit" disabled={!question.trim() || isLoading} aria-label="Send question">↑</button>
+          <button type="submit" disabled={!question.trim() || isLoading} aria-label="Send question">
+            ↑
+          </button>
         </form>
-        <p className="composer-footnote">Answers are generated from uploaded past papers </p>
+        <p className="composer-footnote">Answers are generated from uploaded past papers</p>
       </section>
 
       {!isSidebarOpen && (
@@ -180,8 +295,9 @@ function App() {
               ×
             </button>
           </div>
+
           <nav className="sidebar-navigation" aria-label="Sidebar navigation">
-            <button type="button" onClick={startNewChat}>
+            <button type="button" className="new-chat-btn" onClick={startNewChat}>
               <SidebarGlyph kind="plus" />
               <span>New chat</span>
             </button>
@@ -189,27 +305,44 @@ function App() {
               <SidebarGlyph kind="search" />
               <span>Search</span>
             </button>
-            <button className="sidebar-history-link" type="button">
-              <SidebarGlyph kind="history" />
-              <span>History</span>
-            </button>
           </nav>
+
+          <div className="sidebar-history-heading">History</div>
+
           <div className="sidebar-history">
-            {conversationMessages.length === 0 ? (
-              <p className="sidebar-empty">Your questions will appear here.</p>
+            {historySessions.length === 0 || (historySessions.length === 1 && historySessions[0].messages.length === 0) ? (
+              <p className="sidebar-empty">Your previous chats will appear here.</p>
             ) : (
               <nav className="conversation-list" aria-label="Conversation history">
-                {conversationMessages.map((message, index) => (
-                  <button
-                    className="conversation-item"
-                    type="button"
-                    key={message.id}
-                    onClick={() => openConversation(message.id)}
-                  >
-                    <span className="conversation-number">0{index + 1}</span>
-                    <span>{message.content}</span>
-                  </button>
-                ))}
+                {historySessions.map((s, index) => {
+                  const isActive = s.id === activeSessionId
+                  return (
+                    <div
+                      key={s.id}
+                      className={`conversation-item-wrap ${isActive ? 'active' : ''}`}
+                    >
+                      <button
+                        className="conversation-item"
+                        type="button"
+                        onClick={() => selectSession(s.id)}
+                      >
+                        <span className="conversation-number">0{index + 1}</span>
+                        <span className="conversation-title">{s.title || 'Untitled chat'}</span>
+                      </button>
+                      {historySessions.length > 1 && (
+                        <button
+                          className="conversation-delete"
+                          type="button"
+                          title="Delete chat"
+                          aria-label="Delete chat"
+                          onClick={(e) => deleteSession(s.id, e)}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
               </nav>
             )}
           </div>
@@ -226,11 +359,12 @@ type SidebarGlyphProps = {
 }
 
 function SidebarGlyph({ kind }: SidebarGlyphProps) {
-  const path = kind === 'plus'
-    ? 'M12 5v14M5 12h14'
-    : kind === 'search'
-      ? 'm20 20-4.5-4.5m2-5.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z'
-      : 'M4 6.5h16M4 12h16M4 17.5h16'
+  const path =
+    kind === 'plus'
+      ? 'M12 5v14M5 12h14'
+      : kind === 'search'
+        ? 'm20 20-4.5-4.5m2-5.5a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z'
+        : 'M4 6.5h16M4 12h16M4 17.5h16'
 
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
