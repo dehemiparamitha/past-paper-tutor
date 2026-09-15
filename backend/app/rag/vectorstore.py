@@ -1,8 +1,12 @@
+from functools import lru_cache
+
 from langchain_chroma import Chroma
 from app.rag.embeddings import get_embeddings
 
 PERSIST_DIRECTORY="chroma_db"
 
+
+@lru_cache(maxsize=1)
 def get_vectorstore():
     embeddings = get_embeddings()
 
