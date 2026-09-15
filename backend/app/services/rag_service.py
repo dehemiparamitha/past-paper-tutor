@@ -234,7 +234,7 @@ def _clean_question_text(text: str) -> str:
 def _extract_search_topic(query: str) -> str:
     """Strip conversational phrasing so vector search focuses on the actual subject topic."""
     patterns = [
-        r"^(?:what are|show me|find|give me|list|tell me|search for|can you find|can you show)?\s*(?:the\s+)?(?:all\s+)?(?:similar|related|past paper|exam)?\s*questions?\s*(?:on|about|regarding|related to|for)?\s*",
+        r"^(?:what are|show me|show|find|give me|give|provide me|provide|list|tell me|search for|can you find|can you show|display|get)\s*(?:the\s+)?(?:all\s+)?(?:similar|related|past paper|exam)?\s*questions?\s*(?:on|about|regarding|related to|for)?\s*",
         r"^(?:questions?\s+(?:on|about|regarding|related to)\s*)",
     ]
     cleaned = query.strip()
