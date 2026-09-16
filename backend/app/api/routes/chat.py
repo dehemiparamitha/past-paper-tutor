@@ -4,6 +4,7 @@ from app.services.rag_service import (
     find_similar_questions,
     get_topic_frequency,
     get_topic_trends,
+    calculate_important_topics,
 )
 from fastapi import APIRouter, Query
 
@@ -55,4 +56,13 @@ def get_topics_trends(topic: Optional[str] = Query(None)):
     return {
         "total_topics": len(trends),
         "trends": trends,
+    }
+
+@router.get("/api/topics/important")
+def get_important_topics():
+    topics = calculate_important_topics()
+    return {
+        "total_analyzed": len(topics),
+        "high_priority_count": len([t for t in topics if t["tier"] == "High"]),
+        "topics": topics,
     }

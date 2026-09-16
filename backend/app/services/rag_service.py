@@ -535,3 +535,117 @@ def get_topic_trends(topic: Optional[str] = None) -> list[dict[str, Any]]:
         })
 
     return sorted(results, key=lambda x: x["total_questions"], reverse=True)
+
+
+def calculate_important_topics() -> list[dict[str, Any]]:
+    """
+    Computes an empirical Importance Index (0-100) for every syllabus topic using 4 dimensions:
+    1. Frequency (30%): Total question volume relative to top topic
+    2. Recency (25%): Questions appearing in recent exam years weighted higher
+    3. Consistency (25%): Percentage of past paper years where this topic appeared
+    4. Marks / Depth (20%): Weighted marks by question type (MCQ=1, Structured=5, Essay=10)
+    """
+    vectorstore = get_vectorstore()
+    collection = vectorstore._collection
+
+    data = collection.get(include=["metadatas"])
+    metadatas = data.get("metadatas", []) or []
+
+    if not metadatas:
+        return []
+
+    # 1. Gather baseline year range
+    all_years = sorted(list({int(m["paper_year"]) for m in metadatas if m.get("paper_year")}))
+    if not all_years:
+        return []
+
+    total_years_count = len(all_years)
+    min_year = all_years[0]
+    max_year = all_years[-1]
+    year_span = max(1, max_year - min_year)
+
+    # Weights by question format
+    TYPE_WEIGHTS = {"mcq": 1, "structured_essay": 5, "essay": 10}
+
+    topic_stats = defaultdict(lambda: {
+        "total_count": 0,
+        "years": set(),
+        "weighted_marks": 0,
+        "recency_sum": 0.0,
+        "subject_area": "general",
+    })
+
+    for m in metadatas:
+        t = m.get("topic")
+        y = m.get("paper_year")
+        q_type = m.get("question_type", "mcq")
+        subj = m.get("subject_area", "general")
+
+        if not t or not y:
+            continue
+
+        year_int = int(y)
+        stats = topic_stats[t]
+        stats["total_count"] += 1
+        stats["years"].add(year_int)
+        if subj and stats["subject_area"] == "general":
+            stats["subject_area"] = subj
+
+        stats["weighted_marks"] += TYPE_WEIGHTS.get(q_type, 1)
+
+        # Recency scale: 1.0 (oldest year) to 3.0 (newest year)
+        recency_factor = 1.0 + 2.0 * ((year_int - min_year) / year_span)
+        stats["recency_sum"] += recency_factor
+
+    if not topic_stats:
+        return []
+
+    # 2. Maximum values for normalization
+    max_count = max((s["total_count"] for s in topic_stats.values()), default=1)
+    max_marks = max((s["weighted_marks"] for s in topic_stats.values()), default=1)
+    max_recency = max((s["recency_sum"] for s in topic_stats.values()), default=1.0)
+
+    results = []
+    for topic_name, s in topic_stats.items():
+        # Component scores (0-100 scale)
+        freq_score = (s["total_count"] / max_count) * 100
+        consistency_score = (len(s["years"]) / total_years_count) * 100
+        recency_score = (s["recency_sum"] / max_recency) * 100
+        marks_score = (s["weighted_marks"] / max_marks) * 100
+
+        # Weighted Composite Score (0-100)
+        final_score = round(
+            (0.30 * freq_score)
+            + (0.25 * recency_score)
+            + (0.25 * consistency_score)
+            + (0.20 * marks_score)
+        )
+
+        if final_score >= 75:
+            tier = "High"
+            badge = "🔥 Highly Important"
+        elif final_score >= 50:
+            tier = "Moderate"
+            badge = "🟡 Moderate"
+        else:
+            tier = "Low"
+            badge = "🟢 Low"
+
+        results.append({
+            "topic": topic_name,
+            "subject_area": s["subject_area"],
+            "importance_score": final_score,
+            "tier": tier,
+            "badge": badge,
+            "breakdown": {
+                "frequency_score": round(freq_score),
+                "recency_score": round(recency_score),
+                "consistency_score": round(consistency_score),
+                "marks_score": round(marks_score),
+            },
+            "total_questions": s["total_count"],
+            "years_appeared": len(s["years"]),
+            "total_years_evaluated": total_years_count,
+        })
+
+    return sorted(results, key=lambda x: x["importance_score"], reverse=True)
