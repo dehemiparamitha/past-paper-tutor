@@ -5,6 +5,7 @@ from typing import List, Optional
 from app.rag.loader import load_pdf
 from app.rag.chunker import split_questions, chunks_to_langchain_documents
 from app.rag.vectorstore import get_vectorstore
+from app.rag.topic_extractor import enrich_chunks_with_topics
 
 try:
     sys.stdout.reconfigure(encoding='utf-8')
@@ -32,10 +33,13 @@ def ingest_paper(pdf_path: str, vectorstore) -> int:
         print(f"Warning: No question chunks found in {filename}")
         return 0
 
-    # 3. Convert to LangChain Document objects
+    # 3. Automatic LLM topic classification
+    chunks = enrich_chunks_with_topics(chunks)
+
+    # 4. Convert to LangChain Document objects
     docs = chunks_to_langchain_documents(chunks)
 
-    # 4. Generate deterministic, unique IDs for each question chunk
+    # 5. Generate deterministic, unique IDs for each question chunk
     # Format: e.g. "2025_mcq_q1", "2025_structured_essay_q2", "2025_essay_q5"
     doc_ids = [
         f"{c['metadata'].get('paper_year', 'unknown')}_{c['question_type']}_q{c['question_number']}"
@@ -43,7 +47,7 @@ def ingest_paper(pdf_path: str, vectorstore) -> int:
     ]
     print(f"Extracted {len(docs)} question chunks ({chunks[0]['metadata'].get('paper_year', 'Unknown')} Paper)")
 
-    # 5. Ingest into ChromaDB using unique IDs
+    # 6. Ingest into ChromaDB using unique IDs
     vectorstore.add_documents(docs, ids=doc_ids)
     print(f"Successfully stored {len(docs)} documents into ChromaDB.")
     return len(docs)
