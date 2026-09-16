@@ -1,5 +1,10 @@
 from typing import Optional
-from app.services.rag_service import ask_question, find_similar_questions, get_topic_frequency
+from app.services.rag_service import (
+    ask_question,
+    find_similar_questions,
+    get_topic_frequency,
+    get_topic_trends,
+)
 from fastapi import APIRouter, Query
 
 router = APIRouter()
@@ -42,4 +47,12 @@ def get_topics_frequency(
     return {
         "total_topics": len(frequencies),
         "frequencies": frequencies,
+    }
+
+@router.get("/api/topics/trends")
+def get_topics_trends(topic: Optional[str] = Query(None)):
+    trends = get_topic_trends(topic=topic)
+    return {
+        "total_topics": len(trends),
+        "trends": trends,
     }
