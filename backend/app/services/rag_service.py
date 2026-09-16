@@ -1,11 +1,12 @@
 import re
+from collections import Counter
+from typing import Any, Optional
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from app.rag.retriever import get_retriever
 from app.rag.vectorstore import get_vectorstore
-from typing import Any, Optional
 
 load_dotenv()   
 
@@ -422,3 +423,37 @@ def find_similar_questions(
             break
 
     return results
+
+
+def get_topic_frequency(
+    year: Optional[int] = None,
+    start_year: Optional[int] = None,
+    end_year: Optional[int] = None,
+) -> list[dict[str, Any]]:
+    """
+    Aggregates question frequency per topic across all papers or within a specific year range.
+    Returns a sorted list of dicts: [{"topic": "optics", "count": 5}, ...]
+    """
+    vectorstore = get_vectorstore()
+    collection = vectorstore._collection
+
+    chroma_filter = build_chroma_filter(year=year, start_year=start_year, end_year=end_year)
+
+    if chroma_filter:
+        data = collection.get(where=chroma_filter, include=["metadatas"])
+    else:
+        data = collection.get(include=["metadatas"])
+
+    metadatas = data.get("metadatas", []) or []
+    topics = [
+        meta.get("topic")
+        for meta in metadatas
+        if meta and meta.get("topic")
+    ]
+
+    counter = Counter(topics)
+
+    return [
+        {"topic": topic, "count": count}
+        for topic, count in counter.most_common()
+    ]
