@@ -326,7 +326,6 @@ function App() {
                         type="button"
                         onClick={() => selectSession(s.id)}
                       >
-                        <span className="conversation-number">0{index + 1}</span>
                         <span className="conversation-title">{s.title || 'Untitled chat'}</span>
                       </button>
                       {historySessions.length > 1 && (
@@ -349,7 +348,6 @@ function App() {
         </aside>
       )}
 
-      <footer className="footer">Built for revision, one question at a time.</footer>
     </main>
   )
 }
