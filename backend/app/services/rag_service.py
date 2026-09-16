@@ -5,6 +5,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from app.rag.retriever import get_retriever
 from app.rag.vectorstore import get_vectorstore
+from typing import Any, Optional
 
 load_dotenv()   
 
@@ -229,6 +230,104 @@ def _clean_question_text(text: str) -> str:
     text = re.sub(r"\n{3,}", "\n\n", text)
 
     return text.strip()
+    
+
+def extract_metadata_filters(query: str) -> tuple[str, dict[str, Any]]:
+    """
+    Extracts year ranges, specific years, and question types from natural language queries,
+    and returns the cleaned topic query alongside any extracted filters.
+
+    Examples:
+    - "Show recursion questions between 2018 and 2024" -> ("Show recursion questions", {"start_year": 2018, "end_year": 2024})
+    - "Show light questions in 2019" -> ("Show light questions", {"year": 2019})
+    - "MCQ questions on electricity from 2015 to 2020" -> ("questions on electricity", {"start_year": 2015, "end_year": 2020, "question_type": "mcq"})
+    """
+    filters: dict[str, Any] = {}
+    cleaned = query
+
+    # 1. Year range: "between 2018 and 2024", "from 2018 to 2024", "2018-2024", "2018 to 2024"
+    range_match = re.search(
+        r"\b(?:between|from)?\s*(\d{4})\s*(?:and|to|-|–)\s*(\d{4})\b",
+        cleaned,
+        re.IGNORECASE,
+    )
+    if range_match:
+        y1, y2 = int(range_match.group(1)), int(range_match.group(2))
+        filters["start_year"] = min(y1, y2)
+        filters["end_year"] = max(y1, y2)
+        cleaned = cleaned[: range_match.start()] + " " + cleaned[range_match.end() :]
+
+    # 2. Year comparison: "after 2018", "since 2018", "before 2024", "until 2024"
+    if "start_year" not in filters:
+        after_match = re.search(r"\b(?:after|since|from)\s+(\d{4})\b", cleaned, re.IGNORECASE)
+        if after_match:
+            filters["start_year"] = int(after_match.group(1))
+            cleaned = cleaned[: after_match.start()] + " " + cleaned[after_match.end() :]
+
+    if "end_year" not in filters:
+        before_match = re.search(r"\b(?:before|until|up\s+to)\s+(\d{4})\b", cleaned, re.IGNORECASE)
+        if before_match:
+            filters["end_year"] = int(before_match.group(1))
+            cleaned = cleaned[: before_match.start()] + " " + cleaned[before_match.end() :]
+
+    # 3. Single year: "in 2020", "for 2020", "2020 paper"
+    if "start_year" not in filters and "end_year" not in filters:
+        single_year_match = re.search(r"\b(?:in|for)?\s*(20\d{2})\s*(?:paper|exam)?\b", cleaned, re.IGNORECASE)
+        if single_year_match:
+            filters["year"] = int(single_year_match.group(1))
+            cleaned = cleaned[: single_year_match.start()] + " " + cleaned[single_year_match.end() :]
+
+    # 4. Question type extraction
+    if re.search(r"\bmcq(?:s)?\b", cleaned, re.IGNORECASE):
+        filters["question_type"] = "mcq"
+        cleaned = re.sub(r"\bmcq(?:s)?\b", "", cleaned, flags=re.IGNORECASE)
+    elif re.search(r"\bstructured\s+essay(?:s)?\b", cleaned, re.IGNORECASE):
+        filters["question_type"] = "structured_essay"
+        cleaned = re.sub(r"\bstructured\s+essay(?:s)?\b", "", cleaned, flags=re.IGNORECASE)
+    elif re.search(r"\bessay(?:s)?\b", cleaned, re.IGNORECASE):
+        filters["question_type"] = "essay"
+        cleaned = re.sub(r"\bessay(?:s)?\b", "", cleaned, flags=re.IGNORECASE)
+
+    # Normalize whitespace
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned, filters
+
+
+def build_chroma_filter(
+    start_year: Optional[int] = None,
+    end_year: Optional[int] = None,
+    year: Optional[int] = None,
+    question_type: Optional[str] = None,
+    has_diagram: Optional[bool] = None,
+) -> Optional[dict[str, Any]]:
+    """
+    Constructs a valid ChromaDB compound filter dictionary using $and operators.
+    Supports year range ($gte, $lte), exact year, and question_type.
+    """
+    conditions: list[dict[str, Any]] = []
+
+    if year is not None:
+        conditions.append({"paper_year": year})
+    else:
+        if start_year is not None and end_year is not None and start_year == end_year:
+            conditions.append({"paper_year": start_year})
+        else:
+            if start_year is not None:
+                conditions.append({"paper_year": {"$gte": start_year}})
+            if end_year is not None:
+                conditions.append({"paper_year": {"$lte": end_year}})
+
+    if question_type:
+        conditions.append({"question_type": question_type})
+
+    if has_diagram is not None:
+        conditions.append({"has_diagram": has_diagram})
+
+    if not conditions:
+        return None
+    if len(conditions) == 1:
+        return conditions[0]
+    return {"$and": conditions}
 
 
 def _extract_search_topic(query: str) -> str:
@@ -244,24 +343,53 @@ def _extract_search_topic(query: str) -> str:
     return cleaned if len(cleaned) >= 2 else query
 
 
-def find_similar_questions(query: str, limit: int = 5, min_score: float = 0.10) -> list[dict]:
+def find_similar_questions(
+    query: str,
+    limit: int = 5,
+    min_score: float = 0.10,
+    start_year: Optional[int] = None,
+    end_year: Optional[int] = None,
+    year: Optional[int] = None,
+    question_type: Optional[str] = None,
+) -> list[dict]:
     """
-    Return questions that are genuinely relevant to the query topic.
+    Return questions that are genuinely relevant to the query topic with optional metadata filtering.
 
     Applies:
-    1. Conversational intent stripping to isolate the core subject keywords.
-    2. Absolute relevance score threshold (min_score) to filter out unrelated papers.
-    3. Adaptive drop-off cutoff relative to the top match score.
+    1. Automatic extraction of year ranges or question types from natural queries.
+    2. ChromaDB metadata filter application (year range, exact year, question type).
+    3. Conversational intent stripping to isolate the core subject keywords.
+    4. Absolute relevance score threshold (min_score) to filter out unrelated papers.
+    5. Adaptive drop-off cutoff relative to the top match score.
     """
-    topic = _extract_search_topic(query)
+    cleaned_query, extracted_filters = extract_metadata_filters(query)
+
+    # Explicit arguments override query-parsed filters
+    eff_start_year = start_year if start_year is not None else extracted_filters.get("start_year")
+    eff_end_year = end_year if end_year is not None else extracted_filters.get("end_year")
+    eff_year = year if year is not None else extracted_filters.get("year")
+    eff_question_type = question_type if question_type is not None else extracted_filters.get("question_type")
+
+    topic = _extract_search_topic(cleaned_query)
     vectorstore = get_vectorstore()
 
-    # Search with the cleaned topic
-    matches = vectorstore.similarity_search_with_relevance_scores(topic, k=limit * 2)
+    chroma_filter = build_chroma_filter(
+        start_year=eff_start_year,
+        end_year=eff_end_year,
+        year=eff_year,
+        question_type=eff_question_type,
+    )
 
-    # Fallback search with original query if cleaned topic returned no strong matches
-    if (not matches or matches[0][1] < min_score) and topic != query:
-        fallback_matches = vectorstore.similarity_search_with_relevance_scores(query, k=limit * 2)
+    search_kwargs: dict[str, Any] = {"k": limit * 2}
+    if chroma_filter:
+        search_kwargs["filter"] = chroma_filter
+
+    # Search with the cleaned topic
+    matches = vectorstore.similarity_search_with_relevance_scores(topic, **search_kwargs)
+
+    # Fallback search with cleaned query if cleaned topic returned no strong matches
+    if (not matches or matches[0][1] < min_score) and topic != cleaned_query and cleaned_query:
+        fallback_matches = vectorstore.similarity_search_with_relevance_scores(cleaned_query, **search_kwargs)
         if fallback_matches and (not matches or fallback_matches[0][1] > matches[0][1]):
             matches = fallback_matches
 
