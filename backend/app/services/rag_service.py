@@ -1,5 +1,5 @@
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from typing import Any, Optional
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -457,3 +457,81 @@ def get_topic_frequency(
         {"topic": topic, "count": count}
         for topic, count in counter.most_common()
     ]
+
+
+def get_topic_trends(topic: Optional[str] = None) -> list[dict[str, Any]]:
+    """
+    Computes yearly trend statistics for each topic across all available papers.
+    Returns:
+    [
+        {
+            "topic": "light_and_optics",
+            "subject_area": "physics",
+            "total_questions": 18,
+            "yearly_breakdown": {"2018": 3, "2019": 2, "2020": 4, "2021": 4, "2022": 5},
+            "trend": "rising" | "declining" | "stable"
+        },
+        ...
+    ]
+    """
+    vectorstore = get_vectorstore()
+    collection = vectorstore._collection
+
+    data = collection.get(include=["metadatas"])
+    metadatas = data.get("metadatas", []) or []
+
+    if not metadatas:
+        return []
+
+    # Map: topic -> year -> count
+    topic_year_map = defaultdict(lambda: defaultdict(int))
+    topic_subject_map = {}
+    all_years = set()
+
+    for m in metadatas:
+        t = m.get("topic")
+        y = m.get("paper_year")
+        s = m.get("subject_area", "general")
+        if t and y:
+            y_int = int(y)
+            topic_year_map[t][y_int] += 1
+            all_years.add(y_int)
+            if t not in topic_subject_map and s:
+                topic_subject_map[t] = s
+
+    if not all_years:
+        return []
+
+    sorted_years = sorted(list(all_years))
+    results = []
+
+    for t_name, yearly_counts in topic_year_map.items():
+        if topic and t_name.lower() != topic.lower():
+            continue
+
+        counts_by_year = {str(y): yearly_counts.get(y, 0) for y in sorted_years}
+        total = sum(yearly_counts.values())
+
+        # Determine trend direction (comparing last 2 available years to earlier)
+        values = [yearly_counts.get(y, 0) for y in sorted_years]
+        if len(values) >= 3:
+            recent_avg = sum(values[-2:]) / 2.0
+            earlier_avg = sum(values[:-2]) / float(len(values) - 2)
+            if recent_avg > earlier_avg * 1.25 and recent_avg > 0:
+                trend = "rising"
+            elif recent_avg < earlier_avg * 0.75:
+                trend = "declining"
+            else:
+                trend = "stable"
+        else:
+            trend = "stable"
+
+        results.append({
+            "topic": t_name,
+            "subject_area": topic_subject_map.get(t_name, "general"),
+            "total_questions": total,
+            "yearly_breakdown": counts_by_year,
+            "trend": trend,
+        })
+
+    return sorted(results, key=lambda x: x["total_questions"], reverse=True)
