@@ -1,4 +1,13 @@
-import type { SimilarQuestion, SimilarQuestionsResponse } from '../types/api'
+import type {
+  SimilarQuestion,
+  SimilarQuestionsResponse,
+  TopicFrequency,
+  TopicFrequenciesResponse,
+  TopicTrend,
+  TopicTrendsResponse,
+  ImportantTopic,
+  ImportantTopicsResponse,
+} from '../types/api'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
@@ -41,4 +50,33 @@ export async function findSimilarQuestions(question: string): Promise<SimilarQue
   )
   const payload = (await getJson(response)) as SimilarQuestionsResponse
   return payload.results ?? []
+}
+
+export async function fetchTopicFrequencies(params?: {
+  year?: number
+  start_year?: number
+  end_year?: number
+}): Promise<TopicFrequency[]> {
+  const query = new URLSearchParams()
+  if (params?.year) query.set('year', params.year.toString())
+  if (params?.start_year) query.set('start_year', params.start_year.toString())
+  if (params?.end_year) query.set('end_year', params.end_year.toString())
+
+  const queryStr = query.toString() ? `?${query.toString()}` : ''
+  const response = await fetch(`${apiUrl}/api/topics/frequency${queryStr}`)
+  const payload = (await getJson(response)) as TopicFrequenciesResponse
+  return payload.frequencies ?? []
+}
+
+export async function fetchTopicTrends(topic?: string): Promise<TopicTrend[]> {
+  const queryStr = topic ? `?topic=${encodeURIComponent(topic)}` : ''
+  const response = await fetch(`${apiUrl}/api/topics/trends${queryStr}`)
+  const payload = (await getJson(response)) as TopicTrendsResponse
+  return payload.trends ?? []
+}
+
+export async function fetchImportantTopics(): Promise<ImportantTopic[]> {
+  const response = await fetch(`${apiUrl}/api/topics/important`)
+  const payload = (await getJson(response)) as ImportantTopicsResponse
+  return payload.topics ?? []
 }

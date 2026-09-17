@@ -5,6 +5,7 @@ import { isQuestionSearchRequest } from './services/intent'
 import type { ChatSession, Message } from './types/api'
 import { Mark } from './components/Mark'
 import { ChatMessage } from './components/ChatMessage'
+import { TopicAnalytics } from './components/TopicAnalytics'
 import './App.css'
 
 const STORAGE_KEY = 'paperwise_chat_sessions_v1'
@@ -36,6 +37,7 @@ function getInitialSessions(): ChatSession[] {
 }
 
 function App() {
+  const [activeTab, setActiveTab] = useState<'chat' | 'analytics'>('chat')
   const [sessions, setSessions] = useState<ChatSession[]>(getInitialSessions)
   const [activeSessionId, setActiveSessionId] = useState<string>(() => {
     const initial = getInitialSessions()
@@ -65,10 +67,13 @@ function App() {
 
   // Auto-scroll on new messages or loading state
   useEffect(() => {
-    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length, isLoading])
+    if (activeTab === 'chat') {
+      conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages.length, isLoading, activeTab])
 
   const startNewChat = () => {
+    setActiveTab('chat')
     // If the active session is already blank, just focus the composer
     if (activeSession && activeSession.messages.length === 0) {
       composerRef.current?.focus()
@@ -92,12 +97,21 @@ function App() {
   }
 
   const selectSession = (sessionId: string) => {
+    setActiveTab('chat')
     setActiveSessionId(sessionId)
     setError('')
     setQuestion('')
     if (window.innerWidth < 768) {
       setIsSidebarOpen(false)
     }
+  }
+
+  const handlePracticeTopic = (topicName: string) => {
+    setActiveTab('chat')
+    setQuestion(`Find past paper questions on ${topicName}`)
+    setTimeout(() => {
+      composerRef.current?.focus()
+    }, 50)
   }
 
   const deleteSession = (sessionId: string, e: React.MouseEvent) => {
@@ -214,62 +228,66 @@ function App() {
   const historySessions = sessions.filter((s) => s.messages.length > 0 || s.id === activeSessionId)
 
   return (
-    <main className={`page ${messages.length > 0 ? 'chat-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-      <section className="hero">
-        <h1>What can I help you understand?</h1>
-        <p className="intro">Ask questions about your past papers and get clear, exam-focused answers.</p>
-      </section>
+    <main className={`page ${messages.length > 0 && activeTab === 'chat' ? 'chat-mode' : ''} ${activeTab === 'analytics' ? 'analytics-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+      {activeTab === 'chat' ? (
+        <>
+          <section className="hero">
+            <h1>What can I help you understand?</h1>
+            <p className="intro">Ask questions about your past papers and get clear, exam-focused answers.</p>
+          </section>
 
-      <section className="workspace" aria-label="Past paper tutor">
-        <div className="conversation" aria-live="polite">
-          {messages.map((message) => (
-            <ChatMessage
-              key={message.id}
-              message={message}
-              ref={(element) => {
-                messageRefs.current[message.id] = element
-              }}
-            />
-          ))}
+          <section className="workspace" aria-label="Past paper tutor">
+            <div className="conversation" aria-live="polite">
+              {messages.map((message) => (
+                <ChatMessage
+                  key={message.id}
+                  message={message}
+                  ref={(element) => {
+                    messageRefs.current[message.id] = element
+                  }}
+                />
+              ))}
 
-          {isLoading && (
-            <div className="message assistant">
-              <div className="avatar"><Mark /></div>
-              <div className="message-body">
-                <span className="message-name">Paperwise</span>
-                <p className="typing"><i /><i /><i /></p>
-              </div>
+              {isLoading && (
+                <div className="message assistant">
+                  <div className="avatar"><Mark /></div>
+                  <div className="message-body">
+                    <span className="message-name">Paperwise</span>
+                    <p className="typing"><i /><i /><i /></p>
+                  </div>
+                </div>
+              )}
+
+              <div ref={conversationEndRef} style={{ height: 1 }} />
             </div>
-          )}
 
-          <div ref={conversationEndRef} style={{ height: 1 }} />
-        </div>
+            {error && <p className="error">{error}</p>}
 
-
-
-        {error && <p className="error">{error}</p>}
-
-        <form className="composer" onSubmit={askQuestion}>
-          <textarea
-            ref={composerRef}
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault()
-                void askQuestion()
-              }
-            }}
-            placeholder="Ask about a past paper..."
-            aria-label="Ask about a past paper"
-            rows={1}
-          />
-          <button type="submit" disabled={!question.trim() || isLoading} aria-label="Send question">
-            ↑
-          </button>
-        </form>
-        <p className="composer-footnote">Answers are generated from uploaded past papers</p>
-      </section>
+            <form className="composer" onSubmit={askQuestion}>
+              <textarea
+                ref={composerRef}
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    void askQuestion()
+                  }
+                }}
+                placeholder="Ask about a past paper..."
+                aria-label="Ask about a past paper"
+                rows={1}
+              />
+              <button type="submit" disabled={!question.trim() || isLoading} aria-label="Send question">
+                ↑
+              </button>
+            </form>
+            <p className="composer-footnote">Answers are generated from uploaded past papers</p>
+          </section>
+        </>
+      ) : (
+        <TopicAnalytics onPracticeTopic={handlePracticeTopic} />
+      )}
 
       {!isSidebarOpen && (
         <nav className="sidebar-rail" aria-label="Quick actions">
@@ -277,8 +295,25 @@ function App() {
           <button type="button" onClick={startNewChat} aria-label="Start a new chat" title="New chat">
             <SidebarGlyph kind="plus" />
           </button>
-          <button type="button" onClick={focusComposer} aria-label="Search" title="Search">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('chat')
+              focusComposer()
+            }}
+            aria-label="Search"
+            title="Search"
+          >
             <SidebarGlyph kind="search" />
+          </button>
+          <button
+            type="button"
+            className={activeTab === 'analytics' ? 'active-rail-btn' : ''}
+            onClick={() => setActiveTab('analytics')}
+            aria-label="Topic Analytics"
+            title="Topic Analytics"
+          >
+            <SidebarGlyph kind="analytics" />
           </button>
           <button type="button" onClick={() => setIsSidebarOpen(true)} aria-label="Show conversation history" title="History">
             <SidebarGlyph kind="history" />
@@ -301,9 +336,24 @@ function App() {
               <SidebarGlyph kind="plus" />
               <span>New chat</span>
             </button>
-            <button type="button" onClick={focusComposer}>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('chat')
+                focusComposer()
+              }}
+            >
               <SidebarGlyph kind="search" />
               <span>Search</span>
+            </button>
+            <button
+              type="button"
+              className={`nav-analytics-btn ${activeTab === 'analytics' ? 'active' : ''}`}
+              onClick={() => setActiveTab('analytics')}
+            >
+              <SidebarGlyph kind="analytics" />
+              <span>Analytics</span>
+              <span className="nav-pill-badge">Trends</span>
             </button>
           </nav>
 
@@ -314,8 +364,8 @@ function App() {
               <p className="sidebar-empty">Your previous chats will appear here.</p>
             ) : (
               <nav className="conversation-list" aria-label="Conversation history">
-                {historySessions.map((s, index) => {
-                  const isActive = s.id === activeSessionId
+                {historySessions.map((s) => {
+                  const isActive = activeTab === 'chat' && s.id === activeSessionId
                   return (
                     <div
                       key={s.id}
@@ -353,10 +403,26 @@ function App() {
 }
 
 type SidebarGlyphProps = {
-  kind: 'plus' | 'search' | 'history'
+  kind: 'plus' | 'search' | 'history' | 'chat' | 'analytics'
 }
 
 function SidebarGlyph({ kind }: SidebarGlyphProps) {
+  if (kind === 'chat') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+
+  if (kind === 'analytics') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+
   const path =
     kind === 'plus'
       ? 'M12 5v14M5 12h14'
