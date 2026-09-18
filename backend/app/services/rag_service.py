@@ -410,6 +410,10 @@ def find_similar_questions(
             continue
 
         metadata = document.metadata
+        # Skip textbook chunks when retrieving past paper questions
+        if metadata.get("doc_type") == "textbook" or not metadata.get("paper_year"):
+            continue
+
         results.append(
             {
                 "year": metadata.get("paper_year"),
@@ -419,10 +423,56 @@ def find_similar_questions(
                 "similarity": round(max(0.0, min(1.0, relevance)), 2),
             }
         )
+
         if len(results) >= limit:
             break
 
     return results
+
+
+TOPIC_METADATA_REGISTRY: dict[str, dict[str, Any]] = {
+    # Grade 10 Physics
+    "motion_in_a_straight_line": {"grade": 10, "subject_area": "physics"},
+    "newtons_laws_of_motion": {"grade": 10, "subject_area": "physics"},
+    "friction": {"grade": 10, "subject_area": "physics"},
+    "resultant_force": {"grade": 10, "subject_area": "physics"},
+    "turning_effect_of_a_force": {"grade": 10, "subject_area": "physics"},
+    "equilibrium_of_forces": {"grade": 10, "subject_area": "physics"},
+    "hydrostatic_pressure_and_its_applications": {"grade": 10, "subject_area": "physics"},
+    "work_energy_and_power": {"grade": 10, "subject_area": "physics"},
+    "current_electricity": {"grade": 10, "subject_area": "physics"},
+    # Grade 10 Chemistry
+    "structure_of_matter": {"grade": 10, "subject_area": "chemistry"},
+    "quantification_of_elements_and_compounds": {"grade": 10, "subject_area": "chemistry"},
+    "chemical_bonds": {"grade": 10, "subject_area": "chemistry"},
+    "change_in_matter": {"grade": 10, "subject_area": "chemistry"},
+    "rate_of_reaction": {"grade": 10, "subject_area": "chemistry"},
+    # Grade 10 Biology
+    "chemical_basis_of_life": {"grade": 10, "subject_area": "biology"},
+    "structure_and_functions_of_cells": {"grade": 10, "subject_area": "biology"},
+    "characteristics_of_organisms": {"grade": 10, "subject_area": "biology"},
+    "the_world_of_life": {"grade": 10, "subject_area": "biology"},
+    "continuity_of_life": {"grade": 10, "subject_area": "biology"},
+    "inheritance": {"grade": 10, "subject_area": "biology"},
+    # Grade 11 Physics
+    "waves_and_their_applications": {"grade": 11, "subject_area": "physics"},
+    "geometrical_optics": {"grade": 11, "subject_area": "physics"},
+    "heat": {"grade": 11, "subject_area": "physics"},
+    "power_and_energy_of_electric_appliances": {"grade": 11, "subject_area": "physics"},
+    "electronics": {"grade": 11, "subject_area": "physics"},
+    "electromagnetism_and_electromagnetic_induction": {"grade": 11, "subject_area": "physics"},
+    # Grade 11 Chemistry
+    "mixtures": {"grade": 11, "subject_area": "chemistry"},
+    "acids_bases_and_salts": {"grade": 11, "subject_area": "chemistry"},
+    "heat_changes_associated_with_chemical_reactions": {"grade": 11, "subject_area": "chemistry"},
+    "electrochemistry": {"grade": 11, "subject_area": "chemistry"},
+    "hydrocarbons_and_their_derivatives": {"grade": 11, "subject_area": "chemistry"},
+    # Grade 11 Biology
+    "living_tissues": {"grade": 11, "subject_area": "biology"},
+    "photosynthesis": {"grade": 11, "subject_area": "biology"},
+    "biological_processes_in_human_body": {"grade": 11, "subject_area": "biology"},
+    "biosphere": {"grade": 11, "subject_area": "biology"},
+}
 
 
 def get_topic_frequency(
@@ -432,7 +482,7 @@ def get_topic_frequency(
 ) -> list[dict[str, Any]]:
     """
     Aggregates question frequency per topic across all papers or within a specific year range.
-    Returns a sorted list of dicts: [{"topic": "optics", "count": 5}, ...]
+    Returns a sorted list of dicts: [{"topic": "geometrical_optics", "grade": 11, "subject_area": "physics", "count": 5}, ...]
     """
     vectorstore = get_vectorstore()
     collection = vectorstore._collection
@@ -451,10 +501,26 @@ def get_topic_frequency(
         if meta and meta.get("topic")
     ]
 
+    topic_grade_map: dict[str, int] = {}
+    topic_subject_map: dict[str, str] = {}
+    for meta in metadatas:
+        t = meta.get("topic")
+        if t:
+            meta_info = TOPIC_METADATA_REGISTRY.get(t, {})
+            if t not in topic_grade_map:
+                topic_grade_map[t] = meta.get("grade") or meta_info.get("grade", 10)
+            if t not in topic_subject_map:
+                topic_subject_map[t] = meta.get("subject_area") or meta_info.get("subject_area", "general")
+
     counter = Counter(topics)
 
     return [
-        {"topic": topic, "count": count}
+        {
+            "topic": topic,
+            "grade": topic_grade_map.get(topic, TOPIC_METADATA_REGISTRY.get(topic, {}).get("grade", 10)),
+            "subject_area": topic_subject_map.get(topic, TOPIC_METADATA_REGISTRY.get(topic, {}).get("subject_area", "general")),
+            "count": count,
+        }
         for topic, count in counter.most_common()
     ]
 
@@ -465,7 +531,8 @@ def get_topic_trends(topic: Optional[str] = None) -> list[dict[str, Any]]:
     Returns:
     [
         {
-            "topic": "light_and_optics",
+            "topic": "geometrical_optics",
+            "grade": 11,
             "subject_area": "physics",
             "total_questions": 18,
             "yearly_breakdown": {"2018": 3, "2019": 2, "2020": 4, "2021": 4, "2022": 5},
@@ -485,19 +552,24 @@ def get_topic_trends(topic: Optional[str] = None) -> list[dict[str, Any]]:
 
     # Map: topic -> year -> count
     topic_year_map = defaultdict(lambda: defaultdict(int))
-    topic_subject_map = {}
+    topic_subject_map: dict[str, str] = {}
+    topic_grade_map: dict[str, int] = {}
     all_years = set()
 
     for m in metadatas:
         t = m.get("topic")
         y = m.get("paper_year")
-        s = m.get("subject_area", "general")
+        s = m.get("subject_area")
+        g = m.get("grade")
         if t and y:
             y_int = int(y)
             topic_year_map[t][y_int] += 1
             all_years.add(y_int)
-            if t not in topic_subject_map and s:
-                topic_subject_map[t] = s
+            meta_info = TOPIC_METADATA_REGISTRY.get(t, {})
+            if t not in topic_subject_map:
+                topic_subject_map[t] = s or meta_info.get("subject_area", "general")
+            if t not in topic_grade_map:
+                topic_grade_map[t] = g or meta_info.get("grade", 10)
 
     if not all_years:
         return []
@@ -526,9 +598,11 @@ def get_topic_trends(topic: Optional[str] = None) -> list[dict[str, Any]]:
         else:
             trend = "stable"
 
+        meta_info = TOPIC_METADATA_REGISTRY.get(t_name, {})
         results.append({
             "topic": t_name,
-            "subject_area": topic_subject_map.get(t_name, "general"),
+            "grade": topic_grade_map.get(t_name, meta_info.get("grade", 10)),
+            "subject_area": topic_subject_map.get(t_name, meta_info.get("subject_area", "general")),
             "total_questions": total,
             "yearly_breakdown": counts_by_year,
             "trend": trend,
@@ -573,13 +647,15 @@ def calculate_important_topics() -> list[dict[str, Any]]:
         "weighted_marks": 0,
         "recency_sum": 0.0,
         "subject_area": "general",
+        "grade": 10,
     })
 
     for m in metadatas:
         t = m.get("topic")
         y = m.get("paper_year")
         q_type = m.get("question_type", "mcq")
-        subj = m.get("subject_area", "general")
+        subj = m.get("subject_area")
+        gr = m.get("grade")
 
         if not t or not y:
             continue
@@ -588,8 +664,10 @@ def calculate_important_topics() -> list[dict[str, Any]]:
         stats = topic_stats[t]
         stats["total_count"] += 1
         stats["years"].add(year_int)
-        if subj and stats["subject_area"] == "general":
-            stats["subject_area"] = subj
+        
+        meta_info = TOPIC_METADATA_REGISTRY.get(t, {})
+        stats["subject_area"] = subj or meta_info.get("subject_area", stats["subject_area"])
+        stats["grade"] = gr or meta_info.get("grade", stats["grade"])
 
         stats["weighted_marks"] += TYPE_WEIGHTS.get(q_type, 1)
 
@@ -633,6 +711,7 @@ def calculate_important_topics() -> list[dict[str, Any]]:
 
         results.append({
             "topic": topic_name,
+            "grade": s["grade"],
             "subject_area": s["subject_area"],
             "importance_score": final_score,
             "tier": tier,
@@ -649,3 +728,30 @@ def calculate_important_topics() -> list[dict[str, Any]]:
         })
 
     return sorted(results, key=lambda x: x["importance_score"], reverse=True)
+
+
+def retrieve_textbook_content(query: str, k: int = 5) -> list[dict[str, Any]]:
+    """
+    Retrieves relevant textbook theory chunks for a given topic or query from ChromaDB.
+    """
+    vectorstore = get_vectorstore()
+    try:
+        results = vectorstore.similarity_search(
+            query,
+            k=k,
+            filter={"doc_type": "textbook"}
+        )
+    except Exception:
+        results = vectorstore.similarity_search(query, k=k)
+
+    formatted = []
+    for doc in results:
+        meta = doc.metadata or {}
+        formatted.append({
+            "content": doc.page_content,
+            "grade": meta.get("grade"),
+            "source": meta.get("source"),
+            "page_number": meta.get("page_number"),
+            "topic": meta.get("topic")
+        })
+    return formatted
