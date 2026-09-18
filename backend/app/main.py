@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.chat import router as chat_router
+from app.api.routes.practice import router as practice_router
 
 app = FastAPI(
     title = "Past paper tutor API"
@@ -19,3 +20,4 @@ async def root():
     return {"message": "Welcome to the past paper tutor API"}
 
 app.include_router(chat_router)
+app.include_router(practice_router)
