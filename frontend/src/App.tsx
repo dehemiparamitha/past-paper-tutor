@@ -6,6 +6,7 @@ import type { ChatSession, Message } from './types/api'
 import { Mark } from './components/Mark'
 import { ChatMessage } from './components/ChatMessage'
 import { TopicAnalytics } from './components/TopicAnalytics'
+import { PracticeGenerator } from './components/PracticeGenerator'
 import './App.css'
 
 const STORAGE_KEY = 'paperwise_chat_sessions_v1'
@@ -37,7 +38,9 @@ function getInitialSessions(): ChatSession[] {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'chat' | 'analytics'>('chat')
+  const [activeTab, setActiveTab] = useState<'chat' | 'analytics' | 'practice'>('chat')
+  const [practiceTopic, setPracticeTopic] = useState<string>('')
+  const [practiceGrade, setPracticeGrade] = useState<number | undefined>(undefined)
   const [sessions, setSessions] = useState<ChatSession[]>(getInitialSessions)
   const [activeSessionId, setActiveSessionId] = useState<string>(() => {
     const initial = getInitialSessions()
@@ -106,12 +109,10 @@ function App() {
     }
   }
 
-  const handlePracticeTopic = (topicName: string) => {
-    setActiveTab('chat')
-    setQuestion(`Find past paper questions on ${topicName}`)
-    setTimeout(() => {
-      composerRef.current?.focus()
-    }, 50)
+  const handlePracticeTopic = (topicName: string, grade?: number) => {
+    setPracticeTopic(topicName)
+    setPracticeGrade(grade)
+    setActiveTab('practice')
   }
 
   const deleteSession = (sessionId: string, e: React.MouseEvent) => {
@@ -228,8 +229,8 @@ function App() {
   const historySessions = sessions.filter((s) => s.messages.length > 0 || s.id === activeSessionId)
 
   return (
-    <main className={`page ${messages.length > 0 && activeTab === 'chat' ? 'chat-mode' : ''} ${activeTab === 'analytics' ? 'analytics-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-      {activeTab === 'chat' ? (
+    <main className={`page ${messages.length > 0 && activeTab === 'chat' ? 'chat-mode' : ''} ${activeTab === 'analytics' ? 'analytics-mode' : ''} ${activeTab === 'practice' ? 'practice-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+      {activeTab === 'chat' && (
         <>
           <section className="hero">
             <h1>What can I help you understand?</h1>
@@ -285,8 +286,18 @@ function App() {
             <p className="composer-footnote">Answers are generated from uploaded past papers</p>
           </section>
         </>
-      ) : (
+      )}
+
+      {activeTab === 'analytics' && (
         <TopicAnalytics onPracticeTopic={handlePracticeTopic} />
+      )}
+
+      {activeTab === 'practice' && (
+        <PracticeGenerator
+          initialTopic={practiceTopic}
+          initialGrade={practiceGrade}
+          onBackToAnalytics={() => setActiveTab('analytics')}
+        />
       )}
 
       {!isSidebarOpen && (
@@ -314,6 +325,15 @@ function App() {
             title="Topic Analytics"
           >
             <SidebarGlyph kind="analytics" />
+          </button>
+          <button
+            type="button"
+            className={activeTab === 'practice' ? 'active-rail-btn' : ''}
+            onClick={() => setActiveTab('practice')}
+            aria-label="Practice Questions"
+            title="Practice & Quizzes"
+          >
+            <SidebarGlyph kind="practice" />
           </button>
           <button type="button" onClick={() => setIsSidebarOpen(true)} aria-label="Show conversation history" title="History">
             <SidebarGlyph kind="history" />
@@ -354,6 +374,15 @@ function App() {
               <SidebarGlyph kind="analytics" />
               <span>Analytics</span>
               <span className="nav-pill-badge">Trends</span>
+            </button>
+            <button
+              type="button"
+              className={`nav-practice-btn ${activeTab === 'practice' ? 'active' : ''}`}
+              onClick={() => setActiveTab('practice')}
+            >
+              <SidebarGlyph kind="practice" />
+              <span>Practice</span>
+              <span className="nav-pill-badge practice-badge">Quizzes</span>
             </button>
           </nav>
 
@@ -403,7 +432,7 @@ function App() {
 }
 
 type SidebarGlyphProps = {
-  kind: 'plus' | 'search' | 'history' | 'chat' | 'analytics'
+  kind: 'plus' | 'search' | 'history' | 'chat' | 'analytics' | 'practice'
 }
 
 function SidebarGlyph({ kind }: SidebarGlyphProps) {
@@ -419,6 +448,14 @@ function SidebarGlyph({ kind }: SidebarGlyphProps) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
+
+  if (kind === 'practice') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     )
   }

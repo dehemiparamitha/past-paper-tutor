@@ -80,3 +80,33 @@ export async function fetchImportantTopics(): Promise<ImportantTopic[]> {
   const payload = (await getJson(response)) as ImportantTopicsResponse
   return payload.topics ?? []
 }
+
+export async function fetchPracticeTopics(): Promise<import('../types/api').PracticeTopic[]> {
+  const response = await fetch(`${apiUrl}/api/practice/topics`)
+  const payload = (await getJson(response)) as import('../types/api').PracticeTopicsResponse
+  return payload.topics ?? []
+}
+
+export async function generatePracticeQuestions(
+  request: import('../types/api').PracticeGenerateRequest,
+): Promise<import('../types/api').PracticeGenerateResponse> {
+  const response = await fetch(`${apiUrl}/api/practice/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  const payload = (await getJson(response)) as import('../types/api').PracticeGenerateResponse
+  return payload
+}
+
+export async function evaluatePracticeAnswer(
+  request: import('../types/api').PracticeEvaluateRequest,
+): Promise<import('../types/api').PracticeEvaluateResponse> {
+  const response = await fetch(`${apiUrl}/api/practice/evaluate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+  const payload = (await getJson(response)) as import('../types/api').PracticeEvaluateResponse
+  return payload
+}

@@ -3,7 +3,7 @@ import type { ImportantTopic, TopicTrend } from '../types/api'
 import { fetchImportantTopics, fetchTopicTrends } from '../services/api'
 
 interface TopicAnalyticsProps {
-  onPracticeTopic: (topicName: string) => void
+  onPracticeTopic: (topicName: string, grade?: number) => void
 }
 
 function formatTopicName(name: string): string {
@@ -249,9 +249,9 @@ export function TopicAnalytics({ onPracticeTopic }: TopicAnalyticsProps) {
                       <button
                         type="button"
                         className="topic-practice-button"
-                        onClick={() => onPracticeTopic(name)}
+                        onClick={() => onPracticeTopic(item.topic, itemGrade)}
                       >
-                        Practice questions on {name} →
+                        Generate practice questions on {name} →
                       </button>
                     </div>
                   </div>
