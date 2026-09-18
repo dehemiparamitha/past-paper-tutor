@@ -3,7 +3,7 @@ import type { ImportantTopic, TopicTrend } from '../types/api'
 import { fetchImportantTopics, fetchTopicTrends } from '../services/api'
 
 interface TopicAnalyticsProps {
-  onPracticeTopic: (topicName: string) => void
+  onPracticeTopic: (topicName: string, grade?: number) => void
 }
 
 function formatTopicName(name: string): string {
@@ -19,7 +19,7 @@ export function TopicAnalytics({ onPracticeTopic }: TopicAnalyticsProps) {
   const [trends, setTrends] = useState<TopicTrend[]>([])
   const [expandedTopic, setExpandedTopic] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filter, setFilter] = useState<'all' | 'high' | 'rising'>('all')
+  const [filter, setFilter] = useState<'all' | 'grade10' | 'grade11' | 'high' | 'rising'>('all')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -47,9 +47,13 @@ export function TopicAnalytics({ onPracticeTopic }: TopicAnalyticsProps) {
 
   const highCount = topics.filter((t) => t.tier === 'High').length
   const risingCount = trends.filter((t) => t.trend === 'rising').length
+  const grade10Count = topics.filter((t) => (t.grade ?? 10) === 10).length
+  const grade11Count = topics.filter((t) => t.grade === 11).length
 
   const filteredTopics = topics.filter((t) => {
     const trend = trendsMap.get(t.topic.toLowerCase())
+    if (filter === 'grade10' && (t.grade ?? 10) !== 10) return false
+    if (filter === 'grade11' && t.grade !== 11) return false
     if (filter === 'high' && t.tier !== 'High') return false
     if (filter === 'rising' && trend?.trend !== 'rising') return false
     if (searchQuery.trim()) {
@@ -69,7 +73,7 @@ export function TopicAnalytics({ onPracticeTopic }: TopicAnalyticsProps) {
       <div className="analytics-hero">
         <h1>Topic Analytics</h1>
         <p className="analytics-intro">
-          Topics ranked by how often they appear in past papers. Click a topic to see more detail.
+          Official G.C.E. O/L Science syllabus topics ranked by frequency, recency, and exam weight.
         </p>
       </div>
 
@@ -81,7 +85,7 @@ export function TopicAnalytics({ onPracticeTopic }: TopicAnalyticsProps) {
           </svg>
           <input
             type="text"
-            placeholder="Search topics…"
+            placeholder="Search topics or subjects…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -99,6 +103,20 @@ export function TopicAnalytics({ onPracticeTopic }: TopicAnalyticsProps) {
             onClick={() => setFilter('all')}
           >
             All ({topics.length})
+          </button>
+          <button
+            type="button"
+            className={filter === 'grade10' ? 'active' : ''}
+            onClick={() => setFilter('grade10')}
+          >
+            Grade 10 ({grade10Count})
+          </button>
+          <button
+            type="button"
+            className={filter === 'grade11' ? 'active' : ''}
+            onClick={() => setFilter('grade11')}
+          >
+            Grade 11 ({grade11Count})
           </button>
           <button
             type="button"
@@ -143,6 +161,8 @@ export function TopicAnalytics({ onPracticeTopic }: TopicAnalyticsProps) {
             const trend = trendsMap.get(item.topic.toLowerCase())
             const name = formatTopicName(item.topic)
             const isExpanded = expandedTopic === item.topic
+            const itemGrade = item.grade ?? (trend?.grade ?? 10)
+            const subjArea = item.subject_area || trend?.subject_area || 'general'
 
             const trendLabel =
               trend?.trend === 'rising'
@@ -173,6 +193,10 @@ export function TopicAnalytics({ onPracticeTopic }: TopicAnalyticsProps) {
                 >
                   <div className="topic-row-left">
                     <span className="topic-name">{name}</span>
+                    <span className="grade-chip">Gr {itemGrade}</span>
+                    <span className={`subject-chip ${subjArea.toLowerCase()}`}>
+                      {formatTopicName(subjArea)}
+                    </span>
                     <span className={`priority-chip ${item.tier.toLowerCase()}`}>{priorityLabel}</span>
                   </div>
                   <div className="topic-row-right">
@@ -187,8 +211,12 @@ export function TopicAnalytics({ onPracticeTopic }: TopicAnalyticsProps) {
                   <div className="topic-detail-panel">
                     <div className="topic-detail-grid">
                       <div className="detail-cell">
+                        <span className="detail-label">Grade</span>
+                        <span className="detail-value">Grade {itemGrade}</span>
+                      </div>
+                      <div className="detail-cell">
                         <span className="detail-label">Subject area</span>
-                        <span className="detail-value">{formatTopicName(item.subject_area)}</span>
+                        <span className="detail-value">{formatTopicName(subjArea)}</span>
                       </div>
                       <div className="detail-cell">
                         <span className="detail-label">Questions</span>
@@ -221,9 +249,9 @@ export function TopicAnalytics({ onPracticeTopic }: TopicAnalyticsProps) {
                       <button
                         type="button"
                         className="topic-practice-button"
-                        onClick={() => onPracticeTopic(name)}
+                        onClick={() => onPracticeTopic(item.topic, itemGrade)}
                       >
-                        Practice questions on {name} →
+                        Generate practice questions on {name} →
                       </button>
                     </div>
                   </div>

@@ -29,9 +29,10 @@ def test_important():
         years = item["years_appeared"]
         total_years = item["total_years_evaluated"]
         subj = item.get("subject_area", "general")
+        grade = item.get("grade", 10)
 
-        print(f"[{subj.upper():<9}] {topic:<38} Score: {score:>3}/100 (Questions: {q_count:>2}, In {years}/{total_years} yrs)")
-        print(f"            Breakdown -> Freq: {b['frequency_score']}%, Recency: {b['recency_score']}%, Consistency: {b['consistency_score']}%, Marks: {b['marks_score']}%\n")
+        print(f"[GR {grade} | {subj.upper():<9}] {topic:<42} Score: {score:>3}/100 (Questions: {q_count:>2}, In {years}/{total_years} yrs)")
+        print(f"               Breakdown -> Freq: {b['frequency_score']}%, Recency: {b['recency_score']}%, Consistency: {b['consistency_score']}%, Marks: {b['marks_score']}%\n")
 
 if __name__ == "__main__":
     test_important()
