@@ -14,5 +14,10 @@ print("=" * 60)
 
 results = classify_questions_batch(sample_questions)
 for r in results:
-    print(f"[{r.get('subject_area', '').upper()}] Topic: {r.get('topic')} | Subtopic: {r.get('subtopic')}")
-    print(f"  Keywords: {r.get('keywords')}\n")
+    grade = r.get("grade", "N/A")
+    subj = r.get("subject_area", "").upper()
+    topic = r.get("topic", "")
+    subtopic = r.get("subtopic", "")
+    keywords = r.get("keywords", "")
+    print(f"[GRADE {grade} | {subj}] Topic: {topic} | Subtopic: {subtopic}")
+    print(f"  Keywords: {keywords}\n")
