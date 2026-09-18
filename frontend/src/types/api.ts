@@ -28,6 +28,8 @@ export type SimilarQuestionsResponse = {
 
 export type TopicFrequency = {
   topic: string
+  grade?: number
+  subject_area?: string
   count: number
 }
 
@@ -38,6 +40,7 @@ export type TopicFrequenciesResponse = {
 
 export type TopicTrend = {
   topic: string
+  grade?: number
   subject_area: string
   total_questions: number
   yearly_breakdown: Record<string, number>
@@ -58,6 +61,7 @@ export type ImportantTopicScoreBreakdown = {
 
 export type ImportantTopic = {
   topic: string
+  grade?: number
   subject_area: string
   importance_score: number
   tier: 'High' | 'Moderate' | 'Low'
