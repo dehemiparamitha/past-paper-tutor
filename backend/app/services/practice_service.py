@@ -407,3 +407,45 @@ def _generate_fallback_response(
         ],
         "source_references": {"textbook_chunks_used": 0, "past_paper_exemplars_used": 0}
     }
+
+
+def record_practice_attempt(
+    db: Any,
+    question_id: Any,
+    student_answer: str,
+    evaluation_result: Dict[str, Any],
+    user_id: Optional[Any] = None,
+) -> Optional[Any]:
+    """Persists a practice attempt to the PostgreSQL database if available."""
+    try:
+        from app.models.practice import PracticeAttempt, TopicMastery
+        from app.models.question import Question
+        import uuid
+
+        marks_awarded = float(evaluation_result.get("marks_awarded", 0.0))
+        total_marks = float(evaluation_result.get("total_possible_marks", 1.0))
+        pct = float(evaluation_result.get("percentage", 0.0))
+        is_corr = "yes" if pct >= 80.0 else ("partial" if pct > 0 else "no")
+        feedback = evaluation_result.get("feedback", "")
+
+        q_uuid = uuid.UUID(str(question_id)) if isinstance(question_id, (str, uuid.UUID)) else None
+        if not q_uuid:
+            return None
+
+        attempt = PracticeAttempt(
+            user_id=user_id,
+            question_id=q_uuid,
+            student_answer=student_answer,
+            is_correct=is_corr,
+            marks_awarded=marks_awarded,
+            total_possible_marks=total_marks,
+            percentage=pct,
+            ai_feedback=feedback,
+        )
+        db.add(attempt)
+        db.commit()
+        db.refresh(attempt)
+        return attempt
+    except Exception:
+        db.rollback()
+        return None

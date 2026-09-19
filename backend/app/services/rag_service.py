@@ -74,7 +74,7 @@ rag_chain = (
     | llm
 )
 
-def ask_question(question: str):
+def ask_question(question: str, history: Optional[Any] = None):
     response = rag_chain.invoke(question)
     return response.content
 

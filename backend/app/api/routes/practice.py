@@ -1,9 +1,13 @@
+import uuid
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+from app.database.session import get_db
 from app.services.practice_service import (
     generate_practice_questions,
     evaluate_student_answer,
+    record_practice_attempt,
 )
 from app.services.rag_service import TOPIC_METADATA_REGISTRY
 
@@ -26,6 +30,7 @@ class PracticeEvaluateRequest(BaseModel):
     question_type: str = Field("mcq", description="Format of question ('mcq', 'structured_essay', 'essay')")
     marking_scheme: Optional[List[Dict[str, Any]]] = Field(None, description="Detailed marking breakdown")
     total_marks: int = Field(1, ge=1, description="Maximum total marks possible")
+    question_id: Optional[str] = Field(None, description="Optional UUID of the question for tracking")
 
 
 @router.post("/generate")
@@ -47,9 +52,10 @@ def generate_questions(request: PracticeGenerateRequest):
 
 
 @router.post("/evaluate")
-def evaluate_answer(request: PracticeEvaluateRequest):
+def evaluate_answer(request: PracticeEvaluateRequest, db: Session = Depends(get_db)):
     """
-    Evaluates a student's answer against the question's model answer and marking scheme.
+    Evaluates a student's answer against the question's model answer and marking scheme,
+    and optionally records the attempt if question_id is provided.
     """
     result = evaluate_student_answer(
         question=request.question,
@@ -59,6 +65,15 @@ def evaluate_answer(request: PracticeEvaluateRequest):
         marking_scheme=request.marking_scheme,
         total_marks=request.total_marks,
     )
+
+    if request.question_id:
+        record_practice_attempt(
+            db=db,
+            question_id=request.question_id,
+            student_answer=request.student_answer,
+            evaluation_result=result,
+        )
+
     return result
 
 
