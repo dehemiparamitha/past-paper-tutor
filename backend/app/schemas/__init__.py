@@ -1,8 +1,10 @@
 from app.schemas.user import (
-    UserBase, UserCreate, UserLogin, UserUpdate, UserResponse, Token
+    UserBase, UserCreate, UserLogin, UserUpdate, UserResponse,
+    Token, TokenRefreshRequest, TokenRefreshResponse, LogoutRequest,
+    GoogleLoginRequest,
 )
 from app.schemas.document import (
-    DocumentBase, DocumentCreate, DocumentResponse, TopicBase, TopicCreate, TopicResponse
+    DocumentBase, DocumentCreate, DocumentResponse, DocumentType, TopicBase, TopicCreate, TopicResponse
 )
 from app.schemas.question import (
     QuestionBase, QuestionCreate, QuestionResponse, MarkingSchemeResponse
@@ -16,8 +18,10 @@ from app.schemas.practice import (
 )
 
 __all__ = [
-    "UserBase", "UserCreate", "UserLogin", "UserUpdate", "UserResponse", "Token",
-    "DocumentBase", "DocumentCreate", "DocumentResponse", "TopicBase", "TopicCreate", "TopicResponse",
+    "UserBase", "UserCreate", "UserLogin", "UserUpdate", "UserResponse",
+    "Token", "TokenRefreshRequest", "TokenRefreshResponse", "LogoutRequest",
+    "DocumentBase", "DocumentCreate", "DocumentResponse", "DocumentType",
+    "TopicBase", "TopicCreate", "TopicResponse",
     "QuestionBase", "QuestionCreate", "QuestionResponse", "MarkingSchemeResponse",
     "ChatMessageBase", "ChatMessageCreate", "ChatMessageResponse",
     "ChatSessionBase", "ChatSessionCreate", "ChatSessionResponse",

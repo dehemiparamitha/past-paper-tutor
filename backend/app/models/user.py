@@ -1,6 +1,7 @@
 import uuid
+from datetime import datetime
 from typing import List, TYPE_CHECKING
-from sqlalchemy import String, Integer, Boolean
+from sqlalchemy import String, Integer, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base, TimestampMixin
@@ -46,4 +47,34 @@ class User(Base, TimestampMixin):
     )
     topic_masteries: Mapped[List["TopicMastery"]] = relationship(
         "TopicMastery", back_populates="user", cascade="all, delete-orphan"
+    )
+    refresh_tokens: Mapped[List["RefreshToken"]] = relationship(
+        "RefreshToken", back_populates="user", cascade="all, delete-orphan"
+    )
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token: Mapped[str] = mapped_column(
+        Text, unique=True, index=True, nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, index=True
+    )
+    is_revoked: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+
+    # Relationship
+    user: Mapped["User"] = relationship(
+        "User", back_populates="refresh_tokens"
     )
