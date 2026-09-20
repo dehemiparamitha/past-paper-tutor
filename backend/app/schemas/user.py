@@ -32,5 +32,25 @@ class UserResponse(UserBase):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+    expires_in: int  # Access token lifespan in seconds (e.g. 1800 for 30 mins)
     user: UserResponse
+
+class TokenRefreshRequest(BaseModel):
+    refresh_token: str
+
+class TokenRefreshResponse(BaseModel):
+    access_token: str
+    refresh_token: Optional[str] = None
+    token_type: str = "bearer"
+    expires_in: int
+
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+    grade: Optional[int] = 11
+    target_exam: Optional[str] = "GCE O/L"
+

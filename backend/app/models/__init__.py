@@ -1,4 +1,4 @@
-from app.models.user import User
+from app.models.user import User, RefreshToken
 from app.models.subject import Subject
 from app.models.document import Document
 from app.models.topic import Topic
@@ -9,6 +9,7 @@ from app.models.practice import PracticeAttempt, TopicMastery
 
 __all__ = [
     "User",
+    "RefreshToken",
     "Subject",
     "Document",
     "Topic",
