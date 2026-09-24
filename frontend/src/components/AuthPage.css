@@ -1,0 +1,326 @@
+/* ==========================================================================
+   PAPERWISE AUTH PAGES (LOGIN & SIGNUP)
+   ========================================================================== */
+
+.auth-screen-container {
+  min-height: 100vh;
+  width: 100%;
+  background-color: #0b0e14;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  position: relative;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  box-sizing: border-box;
+}
+
+/* Back to landing button */
+.auth-back-to-home {
+  position: absolute;
+  top: 28px;
+  left: 32px;
+  background: transparent;
+  border: 1px solid #1e2633;
+  color: #8b949e;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  font-size: 0.86rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-back-to-home:hover {
+  color: #ffffff;
+  border-color: #3b4657;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Background ambient glow */
+.auth-ambient-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(0, 223, 130, 0.07) 0%, rgba(0, 223, 130, 0) 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Card layout */
+.auth-card-box {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 450px;
+  background: #12161f;
+  border: 1px solid #1e2633;
+  border-radius: 20px;
+  padding: 40px 36px 36px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+}
+
+/* Brand Header */
+.auth-card-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-brand-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #ffffff;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 8px;
+  text-decoration: none;
+}
+
+.auth-brand-logo-icon {
+  color: #00df82;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card-subtitle {
+  font-size: 0.88rem;
+  color: #8b949e;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Error Alert */
+.auth-alert-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  font-size: 0.85rem;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+
+/* Form */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.auth-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-field-label {
+  font-family: 'Space Grotesk', ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #8b949e;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.auth-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.auth-input {
+  width: 100%;
+  background: #0d1117;
+  border: 1px solid #1e2633;
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 0.92rem;
+  padding: 13px 16px;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.auth-input::placeholder {
+  color: #484f58;
+}
+
+.auth-input:focus {
+  border-color: #00df82;
+  box-shadow: 0 0 0 3px rgba(0, 223, 130, 0.12);
+}
+
+.auth-input.has-eye {
+  padding-right: 44px;
+}
+
+.auth-eye-btn {
+  position: absolute;
+  right: 14px;
+  background: transparent;
+  border: none;
+  color: #6e7681;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.auth-eye-btn:hover {
+  color: #cbd5e1;
+}
+
+/* Forgot Password Link */
+.auth-forgot-password-link {
+  background: transparent;
+  border: none;
+  color: #00df82;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+  margin-top: -6px;
+  margin-bottom: 4px;
+  transition: color 0.2s ease;
+  width: fit-content;
+}
+
+.auth-forgot-password-link:hover {
+  color: #00ff95;
+  text-decoration: underline;
+}
+
+/* Primary Action Button */
+.auth-submit-btn {
+  width: 100%;
+  background: #00df82;
+  color: #05140d;
+  border: none;
+  border-radius: 10px;
+  padding: 13px 20px;
+  font-size: 0.96rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 16px rgba(0, 223, 130, 0.25);
+  margin-top: 4px;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+  background: #00ff95;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(0, 223, 130, 0.4);
+}
+
+.auth-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Subtle Divider */
+.auth-divider-wrap {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 22px 0;
+  color: #484f58;
+}
+
+.auth-divider-wrap::before,
+.auth-divider-wrap::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #1e2633;
+}
+
+.auth-divider-text {
+  font-family: 'Space Grotesk', ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #6e7681;
+  letter-spacing: 0.1em;
+  padding: 0 12px;
+  text-transform: uppercase;
+}
+
+/* Google / Social Button */
+.auth-social-btn {
+  width: 100%;
+  background: #0d1117;
+  border: 1px solid #1e2633;
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: #f0f6fc;
+  font-size: 0.9rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.auth-social-btn:hover {
+  background: #161b22;
+  border-color: #3b4657;
+}
+
+.auth-google-icon {
+  width: 16px;
+  height: 16px;
+  color: #8b949e;
+}
+
+/* Footer Mode Switch */
+.auth-switch-footer {
+  margin-top: 26px;
+  text-align: center;
+  font-size: 0.86rem;
+  color: #8b949e;
+}
+
+.auth-switch-btn {
+  background: transparent;
+  border: none;
+  color: #00df82;
+  font-weight: 600;
+  font-size: 0.86rem;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+  transition: color 0.2s ease;
+}
+
+.auth-switch-btn:hover {
+  color: #00ff95;
+  text-decoration: underline;
+}
+
+@media (max-width: 520px) {
+  .auth-card-box {
+    padding: 32px 24px 28px;
+  }
+  .auth-back-to-home {
+    top: 16px;
+    left: 16px;
+  }
+}

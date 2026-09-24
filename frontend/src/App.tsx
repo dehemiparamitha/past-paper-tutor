@@ -7,7 +7,11 @@ import { Mark } from './components/Mark'
 import { ChatMessage } from './components/ChatMessage'
 import { TopicAnalytics } from './components/TopicAnalytics'
 import { PracticeGenerator } from './components/PracticeGenerator'
+import { LandingPage } from './components/LandingPage'
+import { AuthPage } from './components/AuthPage'
+import { useAuth } from './context/AuthContext'
 import './App.css'
+
 
 const STORAGE_KEY = 'paperwise_chat_sessions_v1'
 
@@ -38,6 +42,8 @@ function getInitialSessions(): ChatSession[] {
 }
 
 function App() {
+  const { user, isAuthenticated, isLoading: authIsLoading, logout } = useAuth()
+  const [authView, setAuthView] = useState<'landing' | 'login' | 'register'>('landing')
   const [activeTab, setActiveTab] = useState<'chat' | 'analytics' | 'practice'>('chat')
   const [practiceTopic, setPracticeTopic] = useState<string>('')
   const [practiceGrade, setPracticeGrade] = useState<number | undefined>(undefined)
@@ -228,6 +234,37 @@ function App() {
   // Filter only sessions that have at least one message or the current empty session
   const historySessions = sessions.filter((s) => s.messages.length > 0 || s.id === activeSessionId)
 
+  // If authentication state is still initializing from localStorage token
+  if (authIsLoading) {
+    return (
+      <div className="auth-card-layout" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+          <div className="auth-logo-mark" style={{ width: 36, height: 36, borderRadius: 8 }}><Mark /></div>
+          <div className="auth-spinner" style={{ width: 22, height: 22 }} />
+        </div>
+      </div>
+    )
+  }
+
+  // If user is not logged in: 1. Landing Page -> 2. Login/Register Page
+  if (!isAuthenticated) {
+    if (authView === 'landing') {
+      return (
+        <LandingPage
+          onGetStarted={() => setAuthView('register')}
+          onLogin={() => setAuthView('login')}
+        />
+      )
+    }
+    return (
+      <AuthPage
+        initialTab={authView}
+        onBack={() => setAuthView('landing')}
+      />
+    )
+  }
+
+  // Authenticated Application (Chat Tutor, Analytics, Practice Mode)
   return (
     <main className={`page ${messages.length > 0 && activeTab === 'chat' ? 'chat-mode' : ''} ${activeTab === 'analytics' ? 'analytics-mode' : ''} ${activeTab === 'practice' ? 'practice-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
       {activeTab === 'chat' && (
@@ -338,6 +375,16 @@ function App() {
           <button type="button" onClick={() => setIsSidebarOpen(true)} aria-label="Show conversation history" title="History">
             <SidebarGlyph kind="history" />
           </button>
+
+          <button
+            type="button"
+            className="user-avatar-circle"
+            style={{ width: 26, height: 26, fontSize: 11, marginTop: 'auto', border: 'none', cursor: 'pointer' }}
+            onClick={() => setIsSidebarOpen(true)}
+            title={user?.full_name || user?.email || 'User Profile'}
+          >
+            {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+          </button>
         </nav>
       )}
 
@@ -424,15 +471,35 @@ function App() {
               </nav>
             )}
           </div>
+
+          {/* User Profile / Logout Footer */}
+          <div className="user-profile-badge">
+            <div className="user-avatar-circle">
+              {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+            </div>
+            <div className="user-badge-info">
+              <span className="user-badge-name">{user?.full_name || user?.email}</span>
+              <span className="user-badge-role">
+                {user?.is_admin ? '⚡ Administrator' : `Grade ${user?.grade || 11} Student`}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="user-logout-btn"
+              onClick={logout}
+              title="Log out"
+            >
+              ⎋
+            </button>
+          </div>
         </aside>
       )}
-
     </main>
   )
 }
 
 type SidebarGlyphProps = {
-  kind: 'plus' | 'search' | 'history' | 'chat' | 'analytics' | 'practice'
+  kind: 'plus' | 'search' | 'history' | 'chat' | 'analytics' | 'practice' | 'login'
 }
 
 function SidebarGlyph({ kind }: SidebarGlyphProps) {
@@ -460,6 +527,16 @@ function SidebarGlyph({ kind }: SidebarGlyphProps) {
     )
   }
 
+  if (kind === 'login') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+        <polyline points="10 17 15 12 10 7" />
+        <line x1="15" y1="12" x2="3" y2="12" />
+      </svg>
+    )
+  }
+
   const path =
     kind === 'plus'
       ? 'M12 5v14M5 12h14'
@@ -475,3 +552,4 @@ function SidebarGlyph({ kind }: SidebarGlyphProps) {
 }
 
 export default App
+
