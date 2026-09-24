@@ -161,3 +161,30 @@ export type PracticeEvaluateResponse = {
   key_improvements?: string[]
   error?: string
 }
+
+export type UserProfile = {
+  id: string
+  email: string
+  full_name?: string | null
+  grade: number
+  target_exam: string
+  is_active: boolean
+  is_admin: boolean
+  created_at: string
+}
+
+export type AuthTokenResponse = {
+  access_token: string
+  refresh_token: string
+  token_type: string
+  expires_in: number
+  user: UserProfile
+}
+
+export type TokenRefreshResponse = {
+  access_token: string
+  refresh_token?: string | null
+  token_type: string
+  expires_in: number
+}
+
