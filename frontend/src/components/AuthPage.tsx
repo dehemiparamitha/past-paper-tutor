@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useGoogleLogin } from '@react-oauth/google'
 import { useAuth } from '../context/AuthContext'
 import './AuthPage.css'
@@ -7,6 +7,7 @@ interface AuthPageProps {
   initialTab?: 'login' | 'register'
   onBack?: () => void
   onComplete?: () => void
+  onModeChange?: (mode: 'login' | 'register') => void
 }
 
 function BookBrandIcon() {
@@ -46,7 +47,7 @@ function SocialTargetIcon() {
   )
 }
 
-export function AuthPage({ initialTab = 'login', onBack, onComplete }: AuthPageProps) {
+export function AuthPage({ initialTab = 'login', onComplete, onModeChange }: AuthPageProps) {
   const { loginWithGoogle, loginWithEmail, registerWithEmail } = useAuth()
   const [mode, setMode] = useState<'login' | 'register'>(initialTab)
 
@@ -60,6 +61,12 @@ export function AuthPage({ initialTab = 'login', onBack, onComplete }: AuthPageP
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Sync mode if initialTab changes (e.g. from browser back/forward or parent state)
+  useEffect(() => {
+    setMode(initialTab)
+    setError(null)
+  }, [initialTab])
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
@@ -123,6 +130,9 @@ export function AuthPage({ initialTab = 'login', onBack, onComplete }: AuthPageP
     setError(null)
     setPassword('')
     setConfirmPassword('')
+    if (onModeChange) {
+      onModeChange(newMode)
+    }
   }
 
   return (

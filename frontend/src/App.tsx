@@ -43,7 +43,41 @@ function getInitialSessions(): ChatSession[] {
 
 function App() {
   const { user, isAuthenticated, isLoading: authIsLoading, logout } = useAuth()
-  const [authView, setAuthView] = useState<'landing' | 'login' | 'register'>('landing')
+  const [authView, setAuthView] = useState<'landing' | 'login' | 'register'>(() => {
+    const hash = window.location.hash.toLowerCase()
+    if (hash === '#login') return 'login'
+    if (hash === '#register' || hash === '#signup') return 'register'
+    return 'landing'
+  })
+
+  // Sync authView with browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const hash = window.location.hash.toLowerCase()
+      if (hash === '#login') {
+        setAuthView('login')
+      } else if (hash === '#register' || hash === '#signup') {
+        setAuthView('register')
+      } else {
+        setAuthView('landing')
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
+  const navigateAuth = (view: 'landing' | 'login' | 'register', replace = false) => {
+    setAuthView(view)
+    const newHash = view === 'landing' ? '' : `#${view}`
+    if (window.location.hash !== newHash) {
+      if (replace) {
+        window.history.replaceState({ authView: view }, '', newHash || window.location.pathname)
+      } else {
+        window.history.pushState({ authView: view }, '', newHash || window.location.pathname)
+      }
+    }
+  }
   const [activeTab, setActiveTab] = useState<'chat' | 'analytics' | 'practice'>('chat')
   const [practiceTopic, setPracticeTopic] = useState<string>('')
   const [practiceGrade, setPracticeGrade] = useState<number | undefined>(undefined)
@@ -251,15 +285,15 @@ function App() {
     if (authView === 'landing') {
       return (
         <LandingPage
-          onGetStarted={() => setAuthView('register')}
-          onLogin={() => setAuthView('login')}
+          onGetStarted={() => navigateAuth('register')}
+          onLogin={() => navigateAuth('login')}
         />
       )
     }
     return (
       <AuthPage
         initialTab={authView}
-        onBack={() => setAuthView('landing')}
+        onModeChange={(newMode) => navigateAuth(newMode, true)}
       />
     )
   }

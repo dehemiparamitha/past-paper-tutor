@@ -1,7 +1,3 @@
-/* ==========================================================================
-   PAPERWISE 2.0 LANDING PAGE STYLES
-   ========================================================================== */
-
 :root {
   --pw-bg: #0b0e14;
   --pw-surface: #12161f;
@@ -1034,24 +1030,31 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 24px;
   }
+
   .capabilities-grid {
     grid-template-columns: 1fr;
   }
+
   .capabilities-grid-row-2 {
     grid-template-columns: 1fr;
   }
+
   .workspace-mockup-wrapper {
     grid-template-columns: 1fr;
   }
+
   .workflow-grid {
     grid-template-columns: 1fr;
   }
+
   .testimonials-grid {
     grid-template-columns: 1fr;
   }
+
   .pricing-grid {
     grid-template-columns: 1fr;
   }
+
   .landing-footer-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -1061,16 +1064,20 @@
   .landing-nav-links {
     display: none;
   }
+
   .landing-stats-bar {
     grid-template-columns: 1fr;
     text-align: center;
   }
+
   .landing-stat-item {
     justify-content: center;
   }
+
   .landing-footer-grid {
     grid-template-columns: 1fr;
   }
+
   .landing-footer-bottom {
     flex-direction: column;
     gap: 16px;
