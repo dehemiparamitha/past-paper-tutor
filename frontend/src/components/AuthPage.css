@@ -16,31 +16,6 @@
   box-sizing: border-box;
 }
 
-/* Back to landing button */
-.auth-back-to-home {
-  position: absolute;
-  top: 28px;
-  left: 32px;
-  background: transparent;
-  border: 1px solid #1e2633;
-  color: #8b949e;
-  padding: 8px 16px;
-  border-radius: 9999px;
-  font-size: 0.86rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.auth-back-to-home:hover {
-  color: #ffffff;
-  border-color: #3b4657;
-  background: rgba(255, 255, 255, 0.04);
-}
-
 /* Background ambient glow */
 .auth-ambient-glow {
   position: absolute;
@@ -49,7 +24,7 @@
   transform: translate(-50%, -50%);
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, rgba(0, 223, 130, 0.07) 0%, rgba(0, 223, 130, 0) 70%);
+  background: radial-gradient(circle, rgba(0, 223, 130, 0.08) 0%, rgba(0, 223, 130, 0) 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -79,7 +54,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: #ffffff;
+  color: #ffffff !important;
   font-size: 1.35rem;
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -88,7 +63,7 @@
 }
 
 .auth-brand-logo-icon {
-  color: #00df82;
+  color: #00df82 !important;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -151,7 +126,7 @@
   font-size: 0.92rem;
   padding: 13px 16px;
   outline: none;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   box-sizing: border-box;
 }
 
@@ -160,8 +135,8 @@
 }
 
 .auth-input:focus {
-  border-color: #00df82;
-  box-shadow: 0 0 0 3px rgba(0, 223, 130, 0.12);
+  border-color: #00df82 !important;
+  box-shadow: 0 0 0 3px rgba(0, 223, 130, 0.15) !important;
 }
 
 .auth-input.has-eye {
@@ -186,11 +161,22 @@
   color: #cbd5e1;
 }
 
+/* Browser autofill override so fields stay dark rather than light blue */
+.auth-input:-webkit-autofill,
+.auth-input:-webkit-autofill:hover,
+.auth-input:-webkit-autofill:focus,
+.auth-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #0d1117 inset !important;
+  -webkit-text-fill-color: #ffffff !important;
+  caret-color: #ffffff !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 /* Forgot Password Link */
 .auth-forgot-password-link {
   background: transparent;
   border: none;
-  color: #00df82;
+  color: #00df82 !important;
   font-size: 0.82rem;
   font-weight: 500;
   text-align: left;
@@ -203,16 +189,17 @@
 }
 
 .auth-forgot-password-link:hover {
-  color: #00ff95;
+  color: #00ff95 !important;
   text-decoration: underline;
 }
 
-/* Primary Action Button */
+/* Primary Action Button - Green Figma Emerald */
 .auth-submit-btn {
   width: 100%;
-  background: #00df82;
-  color: #05140d;
-  border: none;
+  background: #00df82 !important;
+  background-color: #00df82 !important;
+  color: #05140d !important;
+  border: none !important;
   border-radius: 10px;
   padding: 13px 20px;
   font-size: 0.96rem;
@@ -224,7 +211,9 @@
 }
 
 .auth-submit-btn:hover:not(:disabled) {
-  background: #00ff95;
+  background: #00ff95 !important;
+  background-color: #00ff95 !important;
+  color: #05140d !important;
   transform: translateY(-1px);
   box-shadow: 0 6px 24px rgba(0, 223, 130, 0.4);
 }
@@ -301,7 +290,7 @@
 .auth-switch-btn {
   background: transparent;
   border: none;
-  color: #00df82;
+  color: #00df82 !important;
   font-weight: 600;
   font-size: 0.86rem;
   cursor: pointer;
@@ -311,16 +300,12 @@
 }
 
 .auth-switch-btn:hover {
-  color: #00ff95;
+  color: #00ff95 !important;
   text-decoration: underline;
 }
 
 @media (max-width: 520px) {
   .auth-card-box {
     padding: 32px 24px 28px;
-  }
-  .auth-back-to-home {
-    top: 16px;
-    left: 16px;
   }
 }
