@@ -354,7 +354,7 @@ function App() {
                 ↑
               </button>
             </form>
-            <p className="composer-footnote">Answers are generated from uploaded past papers</p>
+            <p className="composer-footnote">Answers are generated from verified past papers in the syllabus database</p>
           </section>
         </>
       )}

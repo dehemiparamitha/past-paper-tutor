@@ -160,12 +160,12 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           </div>
 
           <h1 className="landing-hero-title">
-            Study Smarter. Dominate Your<br className="hero-title-break" />
-            Past Papers with AI.
+            <span className="hero-title-line">Study Smarter. Dominate Your</span>
+            <span className="hero-title-line">Past Papers with AI.</span>
           </h1>
 
           <p className="landing-hero-desc">
-            The RAG-powered AI past paper tutor. Upload past exams, query topics instantly, map trends, and get precise, marking-scheme-focused answers.
+            The AI powered past paper tutor. Browse verified past exams, query topics instantly, map trends, and get precise, marking-scheme-focused answers.
           </p>
 
           <div className="landing-hero-actions">
@@ -339,9 +339,9 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
           <div className="workflow-grid">
             <div className="workflow-card">
               <div className="workflow-number">01</div>
-              <h3 className="workflow-title">Upload Past Papers</h3>
+              <h3 className="workflow-title">Curated Paper Library</h3>
               <p className="workflow-desc">
-                Drag and drop standard exam PDFs. Paperwise automatically parses the text, diagrams, and structures.
+                Access an extensive archive of verified past papers and marking schemes, already organized and indexed by administrators.
               </p>
             </div>
 
@@ -425,7 +425,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <ul className="pricing-features-list">
                 <li>
                   <span className="pricing-check"><CheckIcon /></span>
-                  <span>Upload up to 3 past papers</span>
+                  <span>Access to verified past paper library</span>
                 </li>
                 <li>
                   <span className="pricing-check"><CheckIcon /></span>
@@ -461,7 +461,7 @@ export function LandingPage({ onGetStarted, onLogin }: LandingPageProps) {
               <ul className="pricing-features-list">
                 <li>
                   <span className="pricing-check"><CheckIcon /></span>
-                  <span>Unlimited past paper uploads</span>
+                  <span>Full access to complete past paper archive</span>
                 </li>
                 <li>
                   <span className="pricing-check"><CheckIcon /></span>

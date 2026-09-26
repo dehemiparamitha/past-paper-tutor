@@ -175,31 +175,31 @@
 }
 
 .landing-hero-title {
-  font-size: clamp(2.4rem, 5vw, 4.25rem);
+  font-size: clamp(2.2rem, 4.5vw, 4.1rem);
   font-weight: 800;
-  line-height: 1.15;
+  line-height: 1.14;
   letter-spacing: -0.035em;
   color: #ffffff;
-  max-width: 1100px;
+  max-width: 960px;
   margin: 0 auto 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
-.hero-title-break {
-  display: inline;
-}
-
-@media (max-width: 768px) {
-  .hero-title-break {
-    display: none;
-  }
+.hero-title-line {
+  display: block;
+  white-space: normal;
 }
 
 .landing-hero-desc {
-  font-size: clamp(1rem, 2vw, 1.2rem);
+  font-size: clamp(0.98rem, 1.4vw, 1.15rem);
   color: var(--pw-text-muted);
-  max-width: 720px;
-  margin: 0 auto 40px;
+  max-width: 640px;
+  margin: 0 auto 36px;
   line-height: 1.6;
+  text-align: center;
 }
 
 .landing-hero-actions {
