@@ -37,6 +37,30 @@ class User(Base, TimestampMixin):
     is_admin: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
+    language: Mapped[str | None] = mapped_column(
+        String(50), default="English", nullable=True
+    )
+    school: Mapped[str | None] = mapped_column(
+        String(150), nullable=True
+    )
+    district: Mapped[str | None] = mapped_column(
+        String(100), default="Colombo", nullable=True
+    )
+    study_goal: Mapped[str | None] = mapped_column(
+        String(100), default="Finals prep", nullable=True
+    )
+    weekly_hours: Mapped[str | None] = mapped_column(
+        String(50), default="5 hours a week", nullable=True
+    )
+    study_time: Mapped[str | None] = mapped_column(
+        String(50), default="Weekdays at 7 PM", nullable=True
+    )
+    confidence_level: Mapped[str | None] = mapped_column(
+        String(50), default="Finding my footing", nullable=True
+    )
+    onboarding_completed: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False
+    )
 
     # Relationships
     chat_sessions: Mapped[List["ChatSession"]] = relationship(

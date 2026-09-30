@@ -10,7 +10,7 @@ from app.config.settings import settings
 from app.models.user import User, RefreshToken
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import (
-    UserCreate, UserLogin, UserResponse,
+    UserCreate, UserLogin, UserResponse, UserUpdate, OnboardingRequest,
     Token, TokenRefreshResponse,
 )
 
@@ -283,6 +283,62 @@ class UserService:
             )
         return user
 
+    def update_user_profile(
+        self,
+        user_id: uuid.UUID,
+        full_name: Optional[str] = None,
+        grade: Optional[int] = None,
+        target_exam: Optional[str] = None,
+        language: Optional[str] = None,
+        school: Optional[str] = None,
+        district: Optional[str] = None,
+        study_goal: Optional[str] = None,
+        weekly_hours: Optional[str] = None,
+        study_time: Optional[str] = None,
+        confidence_level: Optional[str] = None,
+        onboarding_completed: Optional[bool] = None,
+    ) -> User:
+        user = self.repo.update_profile(
+            user_id=user_id,
+            full_name=full_name,
+            grade=grade,
+            target_exam=target_exam,
+            language=language,
+            school=school,
+            district=district,
+            study_goal=study_goal,
+            weekly_hours=weekly_hours,
+            study_time=study_time,
+            confidence_level=confidence_level,
+            onboarding_completed=onboarding_completed,
+        )
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found",
+            )
+        return user
+
+    def complete_onboarding(
+        self,
+        user_id: uuid.UUID,
+        req: "OnboardingRequest",
+    ) -> User:
+        return self.update_user_profile(
+            user_id=user_id,
+            full_name=req.full_name,
+            grade=req.grade,
+            target_exam=req.target_exam,
+            language=req.language,
+            school=req.school,
+            district=req.district,
+            study_goal=req.study_goal,
+            weekly_hours=req.weekly_hours,
+            study_time=req.study_time,
+            confidence_level=req.confidence_level,
+            onboarding_completed=True,
+        )
+
     def seed_admin_user(
         self,
         email: str = "admin@paperwise.lk",
@@ -307,8 +363,10 @@ class UserService:
             target_exam="GCE O/L",
             is_active=True,
             is_admin=True,
+            onboarding_completed=True,
         )
         self.db.add(admin)
         self.db.commit()
         self.db.refresh(admin)
         return admin
+
