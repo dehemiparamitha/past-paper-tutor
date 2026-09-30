@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import type { UserProfile } from '../types/api'
+import type { UserProfile, OnboardingData } from '../types/api'
 import {
   fetchCurrentUserProfile,
   loginWithGoogle as apiLoginWithGoogle,
   loginWithEmail as apiLoginWithEmail,
   registerWithEmail as apiRegisterWithEmail,
   logoutUser as apiLogoutUser,
+  submitOnboarding as apiSubmitOnboarding,
   getAccessToken,
 } from '../services/api'
 
@@ -14,6 +15,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isAdmin: boolean
   isLoading: boolean
+  needsOnboarding: boolean
   isAuthModalOpen: boolean
   openAuthModal: () => void
   closeAuthModal: () => void
@@ -26,6 +28,7 @@ interface AuthContextType {
     grade?: number
     target_exam?: string
   }) => Promise<void>
+  completeOnboarding: (data: OnboardingData) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -90,6 +93,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const completeOnboarding = async (data: OnboardingData) => {
+    const updated = await apiSubmitOnboarding({ ...data, onboarding_completed: true })
+    setUser(updated)
+  }
+
   const logout = async () => {
     await apiLogoutUser()
     setUser(null)
@@ -98,6 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const openAuthModal = () => setIsAuthModalOpen(true)
   const closeAuthModal = () => setIsAuthModalOpen(false)
 
+  // A new user needs onboarding if they are logged in but haven't completed it
+  const needsOnboarding = !!user && !user.onboarding_completed
+
   return (
     <AuthContext.Provider
       value={{
@@ -105,12 +116,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isAdmin: !!user?.is_admin,
         isLoading,
+        needsOnboarding,
         isAuthModalOpen,
         openAuthModal,
         closeAuthModal,
         loginWithGoogle,
         loginWithEmail,
         registerWithEmail,
+        completeOnboarding,
         logout,
       }}
     >

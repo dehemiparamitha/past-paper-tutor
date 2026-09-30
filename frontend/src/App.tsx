@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import {
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useLocation,
+} from 'react-router-dom'
 import { askTutor, findSimilarQuestions } from './services/api'
 import { isQuestionSearchRequest } from './services/intent'
 import type { ChatSession, Message } from './types/api'
@@ -9,13 +16,11 @@ import { TopicAnalytics } from './components/TopicAnalytics'
 import { PracticeGenerator } from './components/PracticeGenerator'
 import { LandingPage } from './components/LandingPage'
 import { AuthPage } from './components/AuthPage'
+import { ProfileSetup } from './components/ProfileSetup'
 import { useAuth } from './context/AuthContext'
 import './App.css'
 
-
 const STORAGE_KEY = 'paperwise_chat_sessions_v1'
-
-
 
 function getInitialSessions(): ChatSession[] {
   try {
@@ -42,43 +47,10 @@ function getInitialSessions(): ChatSession[] {
 }
 
 function App() {
-  const { user, isAuthenticated, isLoading: authIsLoading, logout } = useAuth()
-  const [authView, setAuthView] = useState<'landing' | 'login' | 'register'>(() => {
-    const hash = window.location.hash.toLowerCase()
-    if (hash === '#login') return 'login'
-    if (hash === '#register' || hash === '#signup') return 'register'
-    return 'landing'
-  })
+  const { user, isAuthenticated, isLoading: authIsLoading, needsOnboarding, logout } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
 
-  // Sync authView with browser back/forward buttons
-  useEffect(() => {
-    const handlePopState = () => {
-      const hash = window.location.hash.toLowerCase()
-      if (hash === '#login') {
-        setAuthView('login')
-      } else if (hash === '#register' || hash === '#signup') {
-        setAuthView('register')
-      } else {
-        setAuthView('landing')
-      }
-    }
-
-    window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
-  }, [])
-
-  const navigateAuth = (view: 'landing' | 'login' | 'register', replace = false) => {
-    setAuthView(view)
-    const newHash = view === 'landing' ? '' : `#${view}`
-    if (window.location.hash !== newHash) {
-      if (replace) {
-        window.history.replaceState({ authView: view }, '', newHash || window.location.pathname)
-      } else {
-        window.history.pushState({ authView: view }, '', newHash || window.location.pathname)
-      }
-    }
-  }
-  const [activeTab, setActiveTab] = useState<'chat' | 'analytics' | 'practice'>('chat')
   const [practiceTopic, setPracticeTopic] = useState<string>('')
   const [practiceGrade, setPracticeGrade] = useState<number | undefined>(undefined)
   const [sessions, setSessions] = useState<ChatSession[]>(getInitialSessions)
@@ -109,15 +81,15 @@ function App() {
   const messages = activeSession?.messages ?? []
 
   // Auto-scroll on new messages or loading state
+  const isChatTab = location.pathname === '/chat' || (location.pathname === '/' && isAuthenticated && !needsOnboarding)
   useEffect(() => {
-    if (activeTab === 'chat') {
+    if (isChatTab) {
       conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages.length, isLoading, activeTab])
+  }, [messages.length, isLoading, isChatTab])
 
   const startNewChat = () => {
-    setActiveTab('chat')
-    // If the active session is already blank, just focus the composer
+    navigate('/chat')
     if (activeSession && activeSession.messages.length === 0) {
       composerRef.current?.focus()
       return
@@ -140,7 +112,7 @@ function App() {
   }
 
   const selectSession = (sessionId: string) => {
-    setActiveTab('chat')
+    navigate('/chat')
     setActiveSessionId(sessionId)
     setError('')
     setQuestion('')
@@ -152,7 +124,7 @@ function App() {
   const handlePracticeTopic = (topicName: string, grade?: number) => {
     setPracticeTopic(topicName)
     setPracticeGrade(grade)
-    setActiveTab('practice')
+    navigate('/practice')
   }
 
   const deleteSession = (sessionId: string, e: React.MouseEvent) => {
@@ -198,7 +170,6 @@ function App() {
     setError('')
     setIsLoading(true)
 
-    // Append user message and set title if this is the first message
     setSessions((prev) =>
       prev.map((s) => {
         if (s.id !== activeSessionId) return s
@@ -268,7 +239,7 @@ function App() {
   // Filter only sessions that have at least one message or the current empty session
   const historySessions = sessions.filter((s) => s.messages.length > 0 || s.id === activeSessionId)
 
-  // If authentication state is still initializing from localStorage token
+  // Loading spinner while auth is initializing
   if (authIsLoading) {
     return (
       <div className="auth-card-layout" style={{ display: 'grid', placeItems: 'center', minHeight: '100vh' }}>
@@ -280,28 +251,14 @@ function App() {
     )
   }
 
-  // If user is not logged in: 1. Landing Page -> 2. Login/Register Page
-  if (!isAuthenticated) {
-    if (authView === 'landing') {
-      return (
-        <LandingPage
-          onGetStarted={() => navigateAuth('register')}
-          onLogin={() => navigateAuth('login')}
-        />
-      )
-    }
-    return (
-      <AuthPage
-        initialTab={authView}
-        onModeChange={(newMode) => navigateAuth(newMode, true)}
-      />
-    )
-  }
-
-  // Authenticated Application (Chat Tutor, Analytics, Practice Mode)
-  return (
-    <main className={`page ${messages.length > 0 && activeTab === 'chat' ? 'chat-mode' : ''} ${activeTab === 'analytics' ? 'analytics-mode' : ''} ${activeTab === 'practice' ? 'practice-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-      {activeTab === 'chat' && (
+  // Helper render for the authenticated main workspace (Chat, Analytics, Practice)
+  const renderAuthenticatedWorkspace = (tab: 'chat' | 'analytics' | 'practice') => (
+    <main
+      className={`page ${messages.length > 0 && tab === 'chat' ? 'chat-mode' : ''} ${
+        tab === 'analytics' ? 'analytics-mode' : ''
+      } ${tab === 'practice' ? 'practice-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}
+    >
+      {tab === 'chat' && (
         <>
           <section className="hero">
             <h1>What can I help you understand?</h1>
@@ -359,28 +316,36 @@ function App() {
         </>
       )}
 
-      {activeTab === 'analytics' && (
+      {tab === 'analytics' && (
         <TopicAnalytics onPracticeTopic={handlePracticeTopic} />
       )}
 
-      {activeTab === 'practice' && (
+      {tab === 'practice' && (
         <PracticeGenerator
           initialTopic={practiceTopic}
           initialGrade={practiceGrade}
-          onBackToAnalytics={() => setActiveTab('analytics')}
+          onBackToAnalytics={() => navigate('/analytics')}
         />
       )}
 
       {!isSidebarOpen && (
         <nav className="sidebar-rail" aria-label="Quick actions">
-          <a className="rail-logo" href="/" aria-label="Paperwise home"><Mark /></a>
+          <button
+            type="button"
+            className="rail-logo"
+            onClick={() => navigate('/chat')}
+            aria-label="Paperwise home"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            <Mark />
+          </button>
           <button type="button" onClick={startNewChat} aria-label="Start a new chat" title="New chat">
             <SidebarGlyph kind="plus" />
           </button>
           <button
             type="button"
             onClick={() => {
-              setActiveTab('chat')
+              navigate('/chat')
               focusComposer()
             }}
             aria-label="Search"
@@ -390,8 +355,8 @@ function App() {
           </button>
           <button
             type="button"
-            className={activeTab === 'analytics' ? 'active-rail-btn' : ''}
-            onClick={() => setActiveTab('analytics')}
+            className={tab === 'analytics' ? 'active-rail-btn' : ''}
+            onClick={() => navigate('/analytics')}
             aria-label="Topic Analytics"
             title="Topic Analytics"
           >
@@ -399,8 +364,8 @@ function App() {
           </button>
           <button
             type="button"
-            className={activeTab === 'practice' ? 'active-rail-btn' : ''}
-            onClick={() => setActiveTab('practice')}
+            className={tab === 'practice' ? 'active-rail-btn' : ''}
+            onClick={() => navigate('/practice')}
             aria-label="Practice Questions"
             title="Practice & Quizzes"
           >
@@ -414,8 +379,8 @@ function App() {
             type="button"
             className="user-avatar-circle"
             style={{ width: 26, height: 26, fontSize: 11, marginTop: 'auto', border: 'none', cursor: 'pointer' }}
-            onClick={() => setIsSidebarOpen(true)}
-            title={user?.full_name || user?.email || 'User Profile'}
+            onClick={() => navigate('/onboarding')}
+            title={`${user?.full_name || user?.email || 'User Profile'} · Click to edit profile`}
           >
             {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
           </button>
@@ -426,7 +391,7 @@ function App() {
         <aside className="conversation-sidebar" id="conversation-sidebar" aria-label="Previous conversations">
           <div className="sidebar-brand">
             <span className="sidebar-brand-mark"><Mark /></span>
-            <span>paperwise</span>
+            <span style={{ cursor: 'pointer' }} onClick={() => navigate('/chat')}>paperwise</span>
             <button className="sidebar-close" type="button" onClick={() => setIsSidebarOpen(false)} aria-label="Close sidebar">
               ×
             </button>
@@ -440,7 +405,7 @@ function App() {
             <button
               type="button"
               onClick={() => {
-                setActiveTab('chat')
+                navigate('/chat')
                 focusComposer()
               }}
             >
@@ -449,8 +414,8 @@ function App() {
             </button>
             <button
               type="button"
-              className={`nav-analytics-btn ${activeTab === 'analytics' ? 'active' : ''}`}
-              onClick={() => setActiveTab('analytics')}
+              className={`nav-analytics-btn ${tab === 'analytics' ? 'active' : ''}`}
+              onClick={() => navigate('/analytics')}
             >
               <SidebarGlyph kind="analytics" />
               <span>Analytics</span>
@@ -458,8 +423,8 @@ function App() {
             </button>
             <button
               type="button"
-              className={`nav-practice-btn ${activeTab === 'practice' ? 'active' : ''}`}
-              onClick={() => setActiveTab('practice')}
+              className={`nav-practice-btn ${tab === 'practice' ? 'active' : ''}`}
+              onClick={() => navigate('/practice')}
             >
               <SidebarGlyph kind="practice" />
               <span>Practice</span>
@@ -475,7 +440,7 @@ function App() {
             ) : (
               <nav className="conversation-list" aria-label="Conversation history">
                 {historySessions.map((s) => {
-                  const isActive = activeTab === 'chat' && s.id === activeSessionId
+                  const isActive = tab === 'chat' && s.id === activeSessionId
                   return (
                     <div
                       key={s.id}
@@ -507,7 +472,12 @@ function App() {
           </div>
 
           {/* User Profile / Logout Footer */}
-          <div className="user-profile-badge">
+          <div
+            className="user-profile-badge"
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate('/onboarding')}
+            title="Click to view or edit Academic Profile & Onboarding"
+          >
             <div className="user-avatar-circle">
               {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
             </div>
@@ -520,7 +490,11 @@ function App() {
             <button
               type="button"
               className="user-logout-btn"
-              onClick={logout}
+              onClick={(e) => {
+                e.stopPropagation()
+                logout()
+                navigate('/')
+              }}
               title="Log out"
             >
               ⎋
@@ -529,6 +503,119 @@ function App() {
         </aside>
       )}
     </main>
+  )
+
+  return (
+    <Routes>
+      {/* 1. Landing / Root Route */}
+      <Route
+        path="/"
+        element={
+          !isAuthenticated ? (
+            <LandingPage
+              onGetStarted={() => navigate('/register')}
+              onLogin={() => navigate('/login')}
+            />
+          ) : needsOnboarding ? (
+            <Navigate to="/onboarding" replace />
+          ) : (
+            renderAuthenticatedWorkspace('chat')
+          )
+        }
+      />
+
+      {/* 2. Login Route */}
+      <Route
+        path="/login"
+        element={
+          isAuthenticated ? (
+            <Navigate to={needsOnboarding ? '/onboarding' : '/chat'} replace />
+          ) : (
+            <AuthPage
+              initialTab="login"
+              onModeChange={(mode) => navigate(mode === 'register' ? '/register' : '/login')}
+              onComplete={() => navigate(needsOnboarding ? '/onboarding' : '/chat')}
+            />
+          )
+        }
+      />
+
+      {/* 3. Register / Signup Routes */}
+      <Route
+        path="/register"
+        element={
+          isAuthenticated ? (
+            <Navigate to={needsOnboarding ? '/onboarding' : '/chat'} replace />
+          ) : (
+            <AuthPage
+              initialTab="register"
+              onModeChange={(mode) => navigate(mode === 'register' ? '/register' : '/login')}
+              onComplete={() => navigate(needsOnboarding ? '/onboarding' : '/chat')}
+            />
+          )
+        }
+      />
+      <Route path="/signup" element={<Navigate to="/register" replace />} />
+
+      {/* 4. Onboarding / Profile Setup Route */}
+      <Route
+        path="/onboarding"
+        element={
+          !isAuthenticated ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <ProfileSetup onComplete={() => navigate('/chat')} />
+          )
+        }
+      />
+      <Route path="/profile-setup" element={<Navigate to="/onboarding" replace />} />
+      <Route path="/setup-profile" element={<Navigate to="/onboarding" replace />} />
+
+      {/* 5. Chat Tutor Workspace Route */}
+      <Route
+        path="/chat"
+        element={
+          !isAuthenticated ? (
+            <Navigate to="/login" replace />
+          ) : needsOnboarding ? (
+            <Navigate to="/onboarding" replace />
+          ) : (
+            renderAuthenticatedWorkspace('chat')
+          )
+        }
+      />
+
+      {/* 6. Topic Analytics & Trends Route */}
+      <Route
+        path="/analytics"
+        element={
+          !isAuthenticated ? (
+            <Navigate to="/login" replace />
+          ) : needsOnboarding ? (
+            <Navigate to="/onboarding" replace />
+          ) : (
+            renderAuthenticatedWorkspace('analytics')
+          )
+        }
+      />
+
+      {/* 7. Practice Questions & Quiz Generator Route */}
+      <Route
+        path="/practice"
+        element={
+          !isAuthenticated ? (
+            <Navigate to="/login" replace />
+          ) : needsOnboarding ? (
+            <Navigate to="/onboarding" replace />
+          ) : (
+            renderAuthenticatedWorkspace('practice')
+          )
+        }
+      />
+
+      {/* 8. Fallback / Catch-All */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 
@@ -586,4 +673,3 @@ function SidebarGlyph({ kind }: SidebarGlyphProps) {
 }
 
 export default App
-

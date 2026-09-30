@@ -168,9 +168,31 @@ export type UserProfile = {
   full_name?: string | null
   grade: number
   target_exam: string
+  language?: string | null
+  school?: string | null
+  district?: string | null
+  study_goal?: string | null
+  weekly_hours?: string | null
+  study_time?: string | null
+  confidence_level?: string | null
+  onboarding_completed: boolean
   is_active: boolean
   is_admin: boolean
   created_at: string
+}
+
+export type OnboardingData = {
+  full_name?: string
+  language?: string
+  school?: string
+  district?: string
+  target_exam?: string
+  grade?: number
+  study_goal?: string
+  weekly_hours?: string
+  study_time?: string
+  confidence_level?: string
+  onboarding_completed?: boolean
 }
 
 export type AuthTokenResponse = {

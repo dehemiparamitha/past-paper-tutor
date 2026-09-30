@@ -14,6 +14,7 @@ import type {
   PracticeEvaluateRequest,
   PracticeEvaluateResponse,
   UserProfile,
+  OnboardingData,
   AuthTokenResponse,
   TokenRefreshResponse,
 } from '../types/api'
@@ -205,6 +206,24 @@ export async function fetchCurrentUserProfile(): Promise<UserProfile | null> {
   } catch {
     return null
   }
+}
+
+export async function submitOnboarding(data: OnboardingData): Promise<UserProfile> {
+  const response = await authFetch(`${apiUrl}/auth/onboarding`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return (await getJson(response)) as UserProfile
+}
+
+export async function updateUserProfile(data: Partial<OnboardingData>): Promise<UserProfile> {
+  const response = await authFetch(`${apiUrl}/auth/profile`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  return (await getJson(response)) as UserProfile
 }
 
 // --- RAG & Chat API ---
