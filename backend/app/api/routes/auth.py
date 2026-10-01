@@ -6,7 +6,7 @@ from app.models.user import User
 from app.schemas.user import (
     UserCreate, UserLogin, UserResponse,
     Token, TokenRefreshRequest, TokenRefreshResponse, LogoutRequest,
-    GoogleLoginRequest,
+    GoogleLoginRequest, OnboardingRequest, UserUpdate,
 )
 from app.services.user_service import UserService
 
@@ -63,6 +63,45 @@ def google_login(req: GoogleLoginRequest, db: Session = Depends(get_db)):
     service = UserService(db)
     return service.authenticate_google_user(req.id_token, req.grade or 11, req.target_exam or "GCE O/L")
 
+@router.post("/onboarding", response_model=UserResponse)
+def complete_onboarding(
+    req: OnboardingRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Submit onboarding profile data (steps 1-6) and mark onboarding as complete.
+    """
+    service = UserService(db)
+    user = service.complete_onboarding(current_user.id, req)
+    return UserResponse.model_validate(user)
+
+@router.patch("/profile", response_model=UserResponse)
+def update_profile(
+    req: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Partially update the current user's profile fields.
+    """
+    service = UserService(db)
+    user = service.update_user_profile(
+        user_id=current_user.id,
+        full_name=req.full_name,
+        grade=req.grade,
+        target_exam=req.target_exam,
+        language=req.language,
+        school=req.school,
+        district=req.district,
+        study_goal=req.study_goal,
+        weekly_hours=req.weekly_hours,
+        study_time=req.study_time,
+        confidence_level=req.confidence_level,
+        onboarding_completed=req.onboarding_completed,
+    )
+    return UserResponse.model_validate(user)
+
 @router.post("/seed-admin", response_model=UserResponse)
 def seed_admin(db: Session = Depends(get_db)):
     """
@@ -71,4 +110,5 @@ def seed_admin(db: Session = Depends(get_db)):
     service = UserService(db)
     admin = service.seed_admin_user()
     return UserResponse.model_validate(admin)
+
 
