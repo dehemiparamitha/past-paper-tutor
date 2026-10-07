@@ -127,19 +127,22 @@ class UserService:
         target_exam: str = "GCE O/L",
     ) -> Token:
         """
-        Verifies a Google OAuth ID Token (JWT) sent from the frontend popup,
-        and logs in or automatically provisions the student in PostgreSQL.
+        Verifies a Google OAuth2 access token sent from the frontend (via useGoogleLogin),
+        fetches user info from Google's userinfo endpoint, and logs in or automatically
+        provisions the student in PostgreSQL.
         """
-        from google.oauth2 import id_token
-        from google.auth.transport import requests as google_requests
+        import urllib.request
+        import json as _json
 
         try:
-            # Cryptographically verify the Google token signature and audience
-            id_info = id_token.verify_oauth2_token(
-                token_str,
-                google_requests.Request(),
-                settings.GOOGLE_CLIENT_ID if settings.GOOGLE_CLIENT_ID else None,
+            # Use Google's userinfo endpoint to validate the access token and get profile data.
+            # The frontend uses useGoogleLogin which returns an OAuth2 access token, not an ID token.
+            req = urllib.request.Request(
+                "https://www.googleapis.com/oauth2/v3/userinfo",
+                headers={"Authorization": f"Bearer {token_str}"},
             )
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                id_info = _json.loads(resp.read().decode())
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
