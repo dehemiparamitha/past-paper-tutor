@@ -62,6 +62,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false)
+  const profileMenuRef = useRef<HTMLDivElement | null>(null)
 
   const messageRefs = useRef<Record<number, HTMLDivElement | null>>({})
   const composerRef = useRef<HTMLTextAreaElement | null>(null)
@@ -75,6 +77,19 @@ function App() {
       // Storage quota or privacy mode
     }
   }, [sessions])
+
+  // Close profile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setIsProfileMenuOpen(false)
+      }
+    }
+    if (isProfileMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isProfileMenuOpen])
 
   // Get active session and its messages
   const activeSession = sessions.find((s) => s.id === activeSessionId) || sessions[0]
@@ -254,9 +269,8 @@ function App() {
   // Helper render for the authenticated main workspace (Chat, Analytics, Practice)
   const renderAuthenticatedWorkspace = (tab: 'chat' | 'analytics' | 'practice') => (
     <main
-      className={`page ${messages.length > 0 && tab === 'chat' ? 'chat-mode' : ''} ${
-        tab === 'analytics' ? 'analytics-mode' : ''
-      } ${tab === 'practice' ? 'practice-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}
+      className={`page ${messages.length > 0 && tab === 'chat' ? 'chat-mode' : ''} ${tab === 'analytics' ? 'analytics-mode' : ''
+        } ${tab === 'practice' ? 'practice-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}
     >
       {tab === 'chat' && (
         <>
@@ -333,11 +347,11 @@ function App() {
           <button
             type="button"
             className="rail-logo"
-            onClick={() => navigate('/chat')}
-            aria-label="Paperwise home"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+            onClick={() => setIsSidebarOpen(true)}
+            aria-label="Open sidebar"
+            title="Open sidebar"
           >
-            <Mark />
+            <Mark size={22} />
           </button>
           <button type="button" onClick={startNewChat} aria-label="Start a new chat" title="New chat">
             <SidebarGlyph kind="plus" />
@@ -375,15 +389,56 @@ function App() {
             <SidebarGlyph kind="history" />
           </button>
 
-          <button
-            type="button"
-            className="user-avatar-circle"
-            style={{ width: 26, height: 26, fontSize: 11, marginTop: 'auto', border: 'none', cursor: 'pointer' }}
-            onClick={() => navigate('/onboarding')}
-            title={`${user?.full_name || user?.email || 'User Profile'} · Click to edit profile`}
-          >
-            {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-          </button>
+          {/* Rail profile button with dropdown */}
+          <div style={{ marginTop: 'auto', position: 'relative' }} ref={profileMenuRef}>
+            {isProfileMenuOpen && (
+              <div className="user-profile-dropdown rail-dropdown" role="menu">
+                <button
+                  type="button"
+                  className="profile-dropdown-btn"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsProfileMenuOpen(false)
+                    navigate('/settings')
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                  <span>Settings</span>
+                </button>
+                <div className="profile-dropdown-divider" />
+                <button
+                  type="button"
+                  className="profile-dropdown-btn danger"
+                  role="menuitem"
+                  onClick={async () => {
+                    setIsProfileMenuOpen(false)
+                    await logout()
+                    navigate('/')
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  <span>Log out</span>
+                </button>
+              </div>
+            )}
+            <button
+              type="button"
+              className="user-avatar-circle rail-user-avatar"
+              onClick={() => setIsProfileMenuOpen((o) => !o)}
+              aria-haspopup="true"
+              aria-expanded={isProfileMenuOpen}
+              title={`${user?.full_name || user?.email || 'User Profile'} \u00b7 Click to open menu`}
+            >
+              {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+            </button>
+          </div>
         </nav>
       )}
 
@@ -471,33 +526,64 @@ function App() {
             )}
           </div>
 
-          {/* User Profile / Logout Footer */}
-          <div
-            className="user-profile-badge"
-            style={{ cursor: 'pointer' }}
-            onClick={() => navigate('/onboarding')}
-            title="Click to view or edit Academic Profile & Onboarding"
-          >
-            <div className="user-avatar-circle">
-              {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-            </div>
-            <div className="user-badge-info">
-              <span className="user-badge-name">{user?.full_name || user?.email}</span>
-              <span className="user-badge-role">
-                {user?.is_admin ? '⚡ Administrator' : `Grade ${user?.grade || 11} Student`}
-              </span>
-            </div>
+          {/* User Profile / Settings Footer */}
+          <div className="user-profile-footer" ref={profileMenuRef}>
+            {isProfileMenuOpen && (
+              <div className="user-profile-dropdown" role="menu">
+                <button
+                  type="button"
+                  className="profile-dropdown-btn"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsProfileMenuOpen(false)
+                    navigate('/settings')
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                  <span>Settings</span>
+                </button>
+                <div className="profile-dropdown-divider" />
+                <button
+                  type="button"
+                  className="profile-dropdown-btn danger"
+                  role="menuitem"
+                  onClick={async () => {
+                    setIsProfileMenuOpen(false)
+                    await logout()
+                    navigate('/')
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  <span>Log out</span>
+                </button>
+              </div>
+            )}
+
             <button
               type="button"
-              className="user-logout-btn"
-              onClick={(e) => {
-                e.stopPropagation()
-                logout()
-                navigate('/')
-              }}
-              title="Log out"
+              className="user-profile-badge"
+              onClick={() => setIsProfileMenuOpen((o) => !o)}
+              aria-haspopup="true"
+              aria-expanded={isProfileMenuOpen}
+              title={`${user?.full_name || user?.email || 'User'} — Click to open menu`}
             >
-              ⎋
+              <div className="user-avatar-circle">
+                {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div className="user-badge-info">
+                <span className="user-badge-name">{user?.full_name || user?.email}</span>
+                <span className="user-badge-role">
+                  {user?.is_admin ? '⚡ Administrator' : `Grade ${user?.grade || 11} Student`}
+                </span>
+              </div>
+              <span className={`user-badge-chevron ${isProfileMenuOpen ? 'open' : ''}`}>▲</span>
             </button>
           </div>
         </aside>
@@ -568,6 +654,17 @@ function App() {
           )
         }
       />
+      {/* 4b. Settings (same as onboarding, but navigates back to /chat on complete) */}
+      <Route
+        path="/settings"
+        element={
+          !isAuthenticated ? (
+            <Navigate to="/login" replace />
+          ) : (
+            <ProfileSetup onComplete={() => navigate('/chat')} isEditMode />
+          )
+        }
+      />
       <Route path="/profile-setup" element={<Navigate to="/onboarding" replace />} />
       <Route path="/setup-profile" element={<Navigate to="/onboarding" replace />} />
 
@@ -626,31 +723,31 @@ type SidebarGlyphProps = {
 function SidebarGlyph({ kind }: SidebarGlyphProps) {
   if (kind === 'chat') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
       </svg>
     )
   }
 
   if (kind === 'analytics') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M18 20V10M12 20V4M6 20v-6" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 20V10M12 20V4M6 20v-6" />
       </svg>
     )
   }
 
   if (kind === 'practice') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
       </svg>
     )
   }
 
   if (kind === 'login') {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
         <polyline points="10 17 15 12 10 7" />
         <line x1="15" y1="12" x2="3" y2="12" />
@@ -666,7 +763,7 @@ function SidebarGlyph({ kind }: SidebarGlyphProps) {
         : 'M4 6.5h16M4 12h16M4 17.5h16'
 
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
+    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d={path} />
     </svg>
   )
