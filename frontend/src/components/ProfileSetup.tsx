@@ -4,6 +4,7 @@ import './ProfileSetup.css'
 
 interface ProfileSetupProps {
   onComplete: () => void
+  isEditMode?: boolean
 }
 
 const SRI_LANKAN_DISTRICTS = [
@@ -73,7 +74,7 @@ const REMAINING_SUBJECTS = [
   'Optional 3',
 ]
 
-export function ProfileSetup({ onComplete }: ProfileSetupProps) {
+export function ProfileSetup({ onComplete, isEditMode = false }: ProfileSetupProps) {
   const { user, completeOnboarding } = useAuth()
 
   // Current active step (1 to 6)
@@ -184,10 +185,10 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
           <button
             type="button"
             className="setup-save-later-btn"
-            onClick={handleSaveAndContinueLater}
+            onClick={isEditMode ? onComplete : handleSaveAndContinueLater}
             disabled={saving}
           >
-            Save & continue later
+            {isEditMode ? '← Back to App' : 'Save & continue later'}
           </button>
         </div>
 
@@ -534,7 +535,7 @@ export function ProfileSetup({ onComplete }: ProfileSetupProps) {
                 onClick={handleFinalSubmit}
                 disabled={saving}
               >
-                {saving ? 'Creating your plan…' : 'Start Learning →'}
+                {saving ? 'Saving…' : isEditMode ? 'Save Changes →' : 'Start Learning →'}
               </button>
             </div>
           </div>
