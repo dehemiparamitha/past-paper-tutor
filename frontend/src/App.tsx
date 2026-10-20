@@ -620,7 +620,10 @@ function App() {
             <AuthPage
               initialTab="login"
               onModeChange={(mode) => navigate(mode === 'register' ? '/register' : '/login')}
-              onComplete={() => navigate(needsOnboarding ? '/onboarding' : '/chat')}
+              onComplete={(u) => {
+                const needs = u ? !u.onboarding_completed : needsOnboarding
+                navigate(needs ? '/onboarding' : '/chat')
+              }}
             />
           )
         }
@@ -636,7 +639,10 @@ function App() {
             <AuthPage
               initialTab="register"
               onModeChange={(mode) => navigate(mode === 'register' ? '/register' : '/login')}
-              onComplete={() => navigate(needsOnboarding ? '/onboarding' : '/chat')}
+              onComplete={(u) => {
+                const needs = u ? !u.onboarding_completed : needsOnboarding
+                navigate(needs ? '/onboarding' : '/chat')
+              }}
             />
           )
         }

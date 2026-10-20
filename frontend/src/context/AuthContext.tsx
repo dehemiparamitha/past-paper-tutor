@@ -19,15 +19,15 @@ interface AuthContextType {
   isAuthModalOpen: boolean
   openAuthModal: () => void
   closeAuthModal: () => void
-  loginWithGoogle: (idToken: string, grade?: number, targetExam?: string) => Promise<void>
-  loginWithEmail: (email: string, pass: string) => Promise<void>
+  loginWithGoogle: (idToken: string, grade?: number, targetExam?: string) => Promise<UserProfile>
+  loginWithEmail: (email: string, pass: string) => Promise<UserProfile>
   registerWithEmail: (params: {
     email: string
     password: string
     full_name?: string
     grade?: number
     target_exam?: string
-  }) => Promise<void>
+  }) => Promise<UserProfile>
   completeOnboarding: (data: OnboardingData) => Promise<void>
   logout: () => Promise<void>
 }
@@ -54,23 +54,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void initAuth()
   }, [])
 
-  const loginWithGoogle = async (idToken: string, grade?: number, targetExam?: string) => {
+  const loginWithGoogle = async (idToken: string, grade?: number, targetExam?: string): Promise<UserProfile> => {
     setIsLoading(true)
     try {
       const authRes = await apiLoginWithGoogle(idToken, grade, targetExam)
       setUser(authRes.user)
       setIsAuthModalOpen(false)
+      return authRes.user
     } finally {
       setIsLoading(false)
     }
   }
 
-  const loginWithEmail = async (email: string, pass: string) => {
+  const loginWithEmail = async (email: string, pass: string): Promise<UserProfile> => {
     setIsLoading(true)
     try {
       const authRes = await apiLoginWithEmail(email, pass)
       setUser(authRes.user)
       setIsAuthModalOpen(false)
+      return authRes.user
     } finally {
       setIsLoading(false)
     }
@@ -82,12 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     full_name?: string
     grade?: number
     target_exam?: string
-  }) => {
+  }): Promise<UserProfile> => {
     setIsLoading(true)
     try {
       const authRes = await apiRegisterWithEmail(params)
       setUser(authRes.user)
       setIsAuthModalOpen(false)
+      return authRes.user
     } finally {
       setIsLoading(false)
     }
