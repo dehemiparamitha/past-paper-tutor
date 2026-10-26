@@ -7,7 +7,9 @@ from app.database.base import Base
 # Create the SQLAlchemy engine
 # pool_pre_ping checks connectivity before handing out connections from the pool
 engine = create_engine(
-    settings.DATABASE_URL,
+    settings.DATABASE_URL.replace(
+        "postgresql://", "postgresql+psycopg2://", 1
+    ),
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20,
