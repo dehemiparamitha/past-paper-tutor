@@ -9,7 +9,7 @@ from app.schemas.document import (
 )
 from app.services.document_service import DocumentService
 
-router = APIRouter(prefix="/documents", tags=["Documents & Topics"])
+router = APIRouter(prefix="/api/documents", tags=["Documents & Topics"])
 
 @router.get("", response_model=List[DocumentResponse])
 def list_documents(

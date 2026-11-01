@@ -6,7 +6,7 @@ from app.database.session import get_db
 from app.schemas.question import QuestionCreate, QuestionResponse
 from app.repositories.question_repository import QuestionRepository
 
-router = APIRouter(prefix="/questions", tags=["Questions"])
+router = APIRouter(prefix="/api/questions", tags=["Questions"])
 
 @router.get("", response_model=List[QuestionResponse])
 def list_questions(

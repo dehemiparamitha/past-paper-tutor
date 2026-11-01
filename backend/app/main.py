@@ -33,6 +33,8 @@ def on_startup():
         print(f"! Database initialization note: {e}")
 
 @app.get("/")
+@app.get("/api")
+@app.get("/api/")
 async def root():
     return {
         "name": settings.PROJECT_NAME,
