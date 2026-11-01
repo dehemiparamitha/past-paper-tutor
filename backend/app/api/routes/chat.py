@@ -20,7 +20,8 @@ router = APIRouter(tags=["Chat & Past Paper RAG"])
 
 # --- Legacy & Direct RAG Chat Endpoints (100% Backward Compatible) ---
 
-@router.post("/chat")
+@router.post("/api/chat")
+@router.post("/chat", include_in_schema=False)
 def chat(request: dict):
     question = request.get("question", "")
     result = ask_question(question)
@@ -80,7 +81,8 @@ def get_important_topics():
 
 # --- Database-Persisted Chat Session Endpoints ---
 
-@router.get("/chat/sessions", response_model=List[ChatSessionResponse])
+@router.get("/api/chat/sessions", response_model=List[ChatSessionResponse])
+@router.get("/chat/sessions", response_model=List[ChatSessionResponse], include_in_schema=False)
 def list_chat_sessions(
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -89,7 +91,8 @@ def list_chat_sessions(
     service = ChatService(db)
     return service.list_sessions(limit=limit)
 
-@router.post("/chat/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/api/chat/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/chat/sessions", response_model=ChatSessionResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 def create_chat_session(
     session_in: ChatSessionCreate,
     db: Session = Depends(get_db),
@@ -98,7 +101,8 @@ def create_chat_session(
     service = ChatService(db)
     return service.create_session(session_in)
 
-@router.get("/chat/sessions/{session_id}", response_model=ChatSessionResponse)
+@router.get("/api/chat/sessions/{session_id}", response_model=ChatSessionResponse)
+@router.get("/chat/sessions/{session_id}", response_model=ChatSessionResponse, include_in_schema=False)
 def get_chat_session(
     session_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -113,7 +117,8 @@ def get_chat_session(
         )
     return session
 
-@router.post("/chat/sessions/{session_id}/message")
+@router.post("/api/chat/sessions/{session_id}/message")
+@router.post("/chat/sessions/{session_id}/message", include_in_schema=False)
 def send_message_to_session(
     session_id: uuid.UUID,
     message_in: ChatMessageCreate,

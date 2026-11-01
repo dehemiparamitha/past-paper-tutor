@@ -20,6 +20,7 @@ import type {
 } from '../types/api'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const apiBase = `${apiUrl}/api`
 
 // --- Token Storage Helpers ---
 
@@ -60,7 +61,7 @@ export async function authFetch(url: string, options: RequestInit = {}): Promise
     const refreshToken = getRefreshToken()
     if (refreshToken) {
       try {
-        const refreshRes = await fetch(`${apiUrl}/auth/refresh`, {
+        const refreshRes = await fetch(`${apiBase}/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh_token: refreshToken }),
@@ -128,7 +129,7 @@ export async function loginWithGoogle(
   grade: number = 11,
   targetExam: string = 'GCE O/L',
 ): Promise<AuthTokenResponse> {
-  const response = await fetch(`${apiUrl}/auth/google`, {
+  const response = await fetch(`${apiBase}/auth/google`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -143,7 +144,7 @@ export async function loginWithGoogle(
 }
 
 export async function loginWithEmail(email: string, password: string): Promise<AuthTokenResponse> {
-  const response = await fetch(`${apiUrl}/auth/login`, {
+  const response = await fetch(`${apiBase}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
@@ -160,7 +161,7 @@ export async function registerWithEmail(params: {
   grade?: number
   target_exam?: string
 }): Promise<AuthTokenResponse> {
-  const response = await fetch(`${apiUrl}/auth/register`, {
+  const response = await fetch(`${apiBase}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -180,7 +181,7 @@ export async function logoutUser(): Promise<void> {
   const refreshToken = getRefreshToken()
   if (refreshToken) {
     try {
-      await fetch(`${apiUrl}/auth/logout`, {
+      await fetch(`${apiBase}/auth/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken }),
@@ -197,7 +198,7 @@ export async function fetchCurrentUserProfile(): Promise<UserProfile | null> {
   if (!token) return null
 
   try {
-    const response = await authFetch(`${apiUrl}/auth/me`)
+    const response = await authFetch(`${apiBase}/auth/me`)
     if (!response.ok) {
       clearAuthTokens()
       return null
@@ -209,7 +210,7 @@ export async function fetchCurrentUserProfile(): Promise<UserProfile | null> {
 }
 
 export async function submitOnboarding(data: OnboardingData): Promise<UserProfile> {
-  const response = await authFetch(`${apiUrl}/auth/onboarding`, {
+  const response = await authFetch(`${apiBase}/auth/onboarding`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -218,7 +219,7 @@ export async function submitOnboarding(data: OnboardingData): Promise<UserProfil
 }
 
 export async function updateUserProfile(data: Partial<OnboardingData>): Promise<UserProfile> {
-  const response = await authFetch(`${apiUrl}/auth/profile`, {
+  const response = await authFetch(`${apiBase}/auth/profile`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -229,7 +230,7 @@ export async function updateUserProfile(data: Partial<OnboardingData>): Promise<
 // --- RAG & Chat API ---
 
 export async function askTutor(question: string): Promise<string> {
-  const response = await authFetch(`${apiUrl}/chat`, {
+  const response = await authFetch(`${apiBase}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question }),
@@ -242,7 +243,7 @@ export async function askTutor(question: string): Promise<string> {
 
 export async function findSimilarQuestions(question: string): Promise<SimilarQuestion[]> {
   const response = await authFetch(
-    `${apiUrl}/api/questions/similar?query=${encodeURIComponent(question)}`,
+    `${apiBase}/questions/similar?query=${encodeURIComponent(question)}`,
   )
   const payload = (await getJson(response)) as SimilarQuestionsResponse
   return payload.results ?? []
@@ -261,20 +262,20 @@ export async function fetchTopicFrequencies(params?: {
   if (params?.end_year) query.set('end_year', params.end_year.toString())
 
   const queryStr = query.toString() ? `?${query.toString()}` : ''
-  const response = await authFetch(`${apiUrl}/api/topics/frequency${queryStr}`)
+  const response = await authFetch(`${apiBase}/topics/frequency${queryStr}`)
   const payload = (await getJson(response)) as TopicFrequenciesResponse
   return payload.frequencies ?? []
 }
 
 export async function fetchTopicTrends(topic?: string): Promise<TopicTrend[]> {
   const queryStr = topic ? `?topic=${encodeURIComponent(topic)}` : ''
-  const response = await authFetch(`${apiUrl}/api/topics/trends${queryStr}`)
+  const response = await authFetch(`${apiBase}/topics/trends${queryStr}`)
   const payload = (await getJson(response)) as TopicTrendsResponse
   return payload.trends ?? []
 }
 
 export async function fetchImportantTopics(): Promise<ImportantTopic[]> {
-  const response = await authFetch(`${apiUrl}/api/topics/important`)
+  const response = await authFetch(`${apiBase}/topics/important`)
   const payload = (await getJson(response)) as ImportantTopicsResponse
   return payload.topics ?? []
 }
@@ -282,7 +283,7 @@ export async function fetchImportantTopics(): Promise<ImportantTopic[]> {
 // --- Practice Questions & Evaluation API ---
 
 export async function fetchPracticeTopics(): Promise<PracticeTopic[]> {
-  const response = await authFetch(`${apiUrl}/api/practice/topics`)
+  const response = await authFetch(`${apiBase}/practice/topics`)
   const payload = (await getJson(response)) as PracticeTopicsResponse
   return payload.topics ?? []
 }
@@ -290,7 +291,7 @@ export async function fetchPracticeTopics(): Promise<PracticeTopic[]> {
 export async function generatePracticeQuestions(
   request: PracticeGenerateRequest,
 ): Promise<PracticeGenerateResponse> {
-  const response = await authFetch(`${apiUrl}/api/practice/generate`, {
+  const response = await authFetch(`${apiBase}/practice/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -302,7 +303,7 @@ export async function generatePracticeQuestions(
 export async function evaluatePracticeAnswer(
   request: PracticeEvaluateRequest,
 ): Promise<PracticeEvaluateResponse> {
-  const response = await authFetch(`${apiUrl}/api/practice/evaluate`, {
+  const response = await authFetch(`${apiBase}/practice/evaluate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
