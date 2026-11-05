@@ -28,6 +28,9 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       CHROMA_HOST: chroma
       CHROMA_PORT: "8000"
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      AWS_S3_PREFIX: ${AWS_S3_PREFIX}
     depends_on:
       db:
         condition: service_healthy

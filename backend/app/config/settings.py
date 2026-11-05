@@ -7,6 +7,11 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api"
 
+    # AWS S3 Configuration
+    AWS_REGION: str = "ap-south-1"
+    S3_BUCKET_NAME: str = ""
+    AWS_S3_PREFIX: str = "documents/"
+
     # PostgreSQL Database URL
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
