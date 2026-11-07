@@ -8,9 +8,9 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api"
 
     # AWS S3 Configuration
-    AWS_REGION: str = "ap-south-1"
-    S3_BUCKET_NAME: str = ""
-    AWS_S3_PREFIX: str = "documents/"
+    AWS_REGION: str = os.getenv("AWS_REGION", "ap-southeast-2")
+    S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME", "paperwise-documents")
+    AWS_S3_PREFIX: str = os.getenv("AWS_S3_PREFIX", "documents/")
 
     # PostgreSQL Database URL
     DATABASE_URL: str = os.getenv(
