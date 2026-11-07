@@ -210,3 +210,47 @@ export type TokenRefreshResponse = {
   expires_in: number
 }
 
+// --- Document Management Types ---
+
+export type DocumentType = 'past_paper' | 'textbook' | 'marking_scheme'
+
+export type ProcessingStatus = 'UPLOADED' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+
+export type DocumentItem = {
+  id: string
+  filename: string
+  file_path?: string | null
+  doc_type: DocumentType
+  year?: number | null
+  grade?: number | null
+  subject_id?: string | null
+  total_pages?: number | null
+  uploaded_at: string
+  processing_status: ProcessingStatus
+  processing_error?: string | null
+  processed_at?: string | null
+}
+
+export type DocumentListResponse = {
+  total: number
+  items: DocumentItem[]
+  page: number
+  limit: number
+}
+
+export type DocumentDownloadResponse = {
+  download_url: string
+  filename: string
+  expires_in: number
+}
+
+export type DocumentFilterParams = {
+  search?: string
+  doc_type?: string
+  grade?: number
+  year?: number
+  processing_status?: string
+  page?: number
+  limit?: number
+}
+

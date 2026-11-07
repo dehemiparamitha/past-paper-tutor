@@ -17,6 +17,10 @@ import type {
   OnboardingData,
   AuthTokenResponse,
   TokenRefreshResponse,
+  DocumentItem,
+  DocumentListResponse,
+  DocumentDownloadResponse,
+  DocumentFilterParams,
 } from '../types/api'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
@@ -310,4 +314,91 @@ export async function evaluatePracticeAnswer(
   })
   const payload = (await getJson(response)) as PracticeEvaluateResponse
   return payload
+}
+
+// --- Document Management API (Admin) ---
+
+export async function fetchDocuments(
+  params?: DocumentFilterParams,
+): Promise<DocumentListResponse> {
+  const query = new URLSearchParams()
+  if (params?.search) query.set('search', params.search)
+  if (params?.doc_type) query.set('doc_type', params.doc_type)
+  if (params?.grade !== undefined && params.grade !== null) query.set('grade', params.grade.toString())
+  if (params?.year !== undefined && params.year !== null) query.set('year', params.year.toString())
+  if (params?.processing_status) query.set('processing_status', params.processing_status)
+  if (params?.page) query.set('page', params.page.toString())
+  if (params?.limit) query.set('limit', params.limit.toString())
+
+  const queryStr = query.toString() ? `?${query.toString()}` : ''
+  const response = await authFetch(`${apiBase}/documents${queryStr}`)
+  return (await getJson(response)) as DocumentListResponse
+}
+
+export async function fetchDocumentDetails(id: string): Promise<DocumentItem> {
+  const response = await authFetch(`${apiBase}/documents/${id}`)
+  return (await getJson(response)) as DocumentItem
+}
+
+export async function uploadDocument(
+  formData: FormData,
+  onProgress?: (percent: number) => void,
+): Promise<DocumentItem> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    const token = getAccessToken()
+
+    xhr.open('POST', `${apiBase}/documents/upload`)
+    if (token) {
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    }
+
+    if (xhr.upload && onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100)
+          onProgress(percent)
+        }
+      }
+    }
+
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText)
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(data as DocumentItem)
+        } else {
+          const detail = data?.detail || `Upload failed with status ${xhr.status}`
+          reject(new Error(typeof detail === 'string' ? detail : JSON.stringify(detail)))
+        }
+      } catch {
+        reject(new Error(`Upload failed with status ${xhr.status}`))
+      }
+    }
+
+    xhr.onerror = () => {
+      reject(new Error('Network error occurred during document upload.'))
+    }
+
+    xhr.send(formData)
+  })
+}
+
+export async function downloadDocument(id: string): Promise<DocumentDownloadResponse> {
+  const response = await authFetch(`${apiBase}/documents/${id}/download`)
+  return (await getJson(response)) as DocumentDownloadResponse
+}
+
+export async function deleteDocument(id: string): Promise<{ success: boolean; message: string }> {
+  const response = await authFetch(`${apiBase}/documents/${id}`, {
+    method: 'DELETE',
+  })
+  return (await getJson(response)) as { success: boolean; message: string }
+}
+
+export async function retryDocumentProcessing(id: string): Promise<DocumentItem> {
+  const response = await authFetch(`${apiBase}/documents/${id}/process`, {
+    method: 'POST',
+  })
+  return (await getJson(response)) as DocumentItem
 }
