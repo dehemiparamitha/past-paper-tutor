@@ -41,6 +41,15 @@ class Document(Base):
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )
+    processing_status: Mapped[str] = mapped_column(
+        String(50), default="UPLOADED", nullable=False, index=True
+    )  # 'UPLOADED' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+    processing_error: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
 
     # Relationships
     subject: Mapped["Subject | None"] = relationship(
