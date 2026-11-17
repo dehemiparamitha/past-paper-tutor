@@ -385,8 +385,12 @@ def load_pdf(file_path: str) -> str:
 
         image_bytes = pixmap.tobytes("png")
 
-        # OCR using Google Vision + Diagram descriptions
-        page_text = extract_text_with_vision(image_bytes, page)
+        # OCR using Google Vision + Diagram descriptions, with PyMuPDF direct text fallback
+        try:
+            page_text = extract_text_with_vision(image_bytes, page)
+        except Exception as e:
+            print(f"Vision API extraction failed for page {page_number}: {e}. Falling back to PyMuPDF direct text extraction.")
+            page_text = page.get_text().strip()
 
         text_parts.append(
             f"\n--- Page {page_number} ---\n"

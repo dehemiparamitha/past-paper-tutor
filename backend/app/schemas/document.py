@@ -24,9 +24,24 @@ class DocumentResponse(DocumentBase):
     id: uuid.UUID
     subject_id: Optional[uuid.UUID] = None
     uploaded_at: datetime
+    file_path: Optional[str] = None
+    processing_status: str = "UPLOADED"
+    processing_error: Optional[str] = None
+    processed_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+class DocumentDownloadResponse(BaseModel):
+    download_url: str
+    filename: str
+    expires_in: int = 3600
+
+class DocumentListResponse(BaseModel):
+    total: int
+    items: List[DocumentResponse]
+    page: int
+    limit: int
 
 class TopicBase(BaseModel):
     name: str

@@ -14,6 +14,7 @@ import { Mark } from './components/Mark'
 import { ChatMessage } from './components/ChatMessage'
 import { TopicAnalytics } from './components/TopicAnalytics'
 import { PracticeGenerator } from './components/PracticeGenerator'
+import { AdminDocuments } from './components/AdminDocuments'
 import { LandingPage } from './components/LandingPage'
 import { AuthPage } from './components/AuthPage'
 import { ProfileSetup } from './components/ProfileSetup'
@@ -266,10 +267,10 @@ function App() {
     )
   }
 
-  // Helper render for the authenticated main workspace (Chat, Analytics, Practice)
-  const renderAuthenticatedWorkspace = (tab: 'chat' | 'analytics' | 'practice') => (
+  // Helper render for the authenticated main workspace (Chat, Analytics, Practice, Admin Documents)
+  const renderAuthenticatedWorkspace = (tab: 'chat' | 'analytics' | 'practice' | 'admin-documents') => (
     <main
-      className={`page ${messages.length > 0 && tab === 'chat' ? 'chat-mode' : ''} ${tab === 'analytics' ? 'analytics-mode' : ''
+      className={`page ${messages.length > 0 && tab === 'chat' ? 'chat-mode' : ''} ${tab === 'analytics' || tab === 'admin-documents' ? 'analytics-mode' : ''
         } ${tab === 'practice' ? 'practice-mode' : ''} ${isSidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}
     >
       {tab === 'chat' && (
@@ -342,6 +343,10 @@ function App() {
         />
       )}
 
+      {tab === 'admin-documents' && (
+        <AdminDocuments />
+      )}
+
       {!isSidebarOpen && (
         <nav className="sidebar-rail" aria-label="Quick actions">
           <button
@@ -385,6 +390,17 @@ function App() {
           >
             <SidebarGlyph kind="practice" />
           </button>
+          {user?.is_admin && (
+            <button
+              type="button"
+              className={tab === 'admin-documents' ? 'active-rail-btn' : ''}
+              onClick={() => navigate('/admin/documents')}
+              aria-label="Document Management"
+              title="Admin Document Management"
+            >
+              <SidebarGlyph kind="documents" />
+            </button>
+          )}
           <button type="button" onClick={() => setIsSidebarOpen(true)} aria-label="Show conversation history" title="History">
             <SidebarGlyph kind="history" />
           </button>
@@ -393,6 +409,23 @@ function App() {
           <div style={{ marginTop: 'auto', position: 'relative' }} ref={profileMenuRef}>
             {isProfileMenuOpen && (
               <div className="user-profile-dropdown rail-dropdown" role="menu">
+                {user?.is_admin && (
+                  <button
+                    type="button"
+                    className="profile-dropdown-btn"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false)
+                      navigate('/admin/documents')
+                    }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                    <span>Manage Documents</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   className="profile-dropdown-btn"
@@ -434,7 +467,7 @@ function App() {
               onClick={() => setIsProfileMenuOpen((o) => !o)}
               aria-haspopup="true"
               aria-expanded={isProfileMenuOpen}
-              title={`${user?.full_name || user?.email || 'User Profile'} \u00b7 Click to open menu`}
+              title={`${user?.full_name || user?.email || 'User Profile'} · Click to open menu`}
             >
               {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
             </button>
@@ -485,6 +518,17 @@ function App() {
               <span>Practice</span>
               <span className="nav-pill-badge practice-badge">Quizzes</span>
             </button>
+            {user?.is_admin && (
+              <button
+                type="button"
+                className={`nav-practice-btn ${tab === 'admin-documents' ? 'active' : ''}`}
+                onClick={() => navigate('/admin/documents')}
+              >
+                <SidebarGlyph kind="documents" />
+                <span>Documents</span>
+                <span className="nav-pill-badge" style={{ background: 'rgba(0, 223, 130, 0.15)', color: 'var(--app-primary)' }}>Admin</span>
+              </button>
+            )}
           </nav>
 
           <div className="sidebar-history-heading">History</div>
@@ -530,6 +574,23 @@ function App() {
           <div className="user-profile-footer" ref={profileMenuRef}>
             {isProfileMenuOpen && (
               <div className="user-profile-dropdown" role="menu">
+                {user?.is_admin && (
+                  <button
+                    type="button"
+                    className="profile-dropdown-btn"
+                    role="menuitem"
+                    onClick={() => {
+                      setIsProfileMenuOpen(false)
+                      navigate('/admin/documents')
+                    }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                    <span>Manage Documents</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   className="profile-dropdown-btn"
@@ -541,7 +602,7 @@ function App() {
                 >
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                   </svg>
                   <span>Settings</span>
                 </button>
@@ -716,6 +777,23 @@ function App() {
         }
       />
 
+      {/* 7b. Admin Document Management Route */}
+      <Route
+        path="/admin/documents"
+        element={
+          !isAuthenticated ? (
+            <Navigate to="/login" replace />
+          ) : needsOnboarding ? (
+            <Navigate to="/onboarding" replace />
+          ) : !user?.is_admin ? (
+            <Navigate to="/chat" replace />
+          ) : (
+            renderAuthenticatedWorkspace('admin-documents')
+          )
+        }
+      />
+      <Route path="/admin" element={<Navigate to="/admin/documents" replace />} />
+
       {/* 8. Fallback / Catch-All */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -723,7 +801,7 @@ function App() {
 }
 
 type SidebarGlyphProps = {
-  kind: 'plus' | 'search' | 'history' | 'chat' | 'analytics' | 'practice' | 'login'
+  kind: 'plus' | 'search' | 'history' | 'chat' | 'analytics' | 'practice' | 'login' | 'documents'
 }
 
 function SidebarGlyph({ kind }: SidebarGlyphProps) {
@@ -747,6 +825,18 @@ function SidebarGlyph({ kind }: SidebarGlyphProps) {
     return (
       <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+      </svg>
+    )
+  }
+
+  if (kind === 'documents') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+        <polyline points="14 2 14 8 20 8" />
+        <line x1="16" y1="13" x2="8" y2="13" />
+        <line x1="16" y1="17" x2="8" y2="17" />
+        <polyline points="10 9 9 9 8 9" />
       </svg>
     )
   }
