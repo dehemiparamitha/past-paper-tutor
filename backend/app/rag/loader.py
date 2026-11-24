@@ -1,4 +1,5 @@
 import os
+import time
 import base64
 import re
 import requests
@@ -69,7 +70,7 @@ def describe_diagram_bytes(image_png_bytes: bytes, question_num: int) -> str:
         return ""
 
     image_base64 = base64.b64encode(image_png_bytes).decode("utf-8")
-    models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+    models = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]
 
     for model_name in models:
         url = (
@@ -166,230 +167,119 @@ def synthesize_diagram_explanation(question_num: int, stem_text: str, pre_option
     return f"Visual diagram for Question {question_num} illustrating the physical setup referenced in the question."
 
 
-def extract_text_with_vision(image_bytes: bytes, page: pymupdf.Page) -> str:
+def extract_text_with_gemini(image_bytes: bytes, page_number: int = 1) -> str:
     """
-    Extract text using Google Cloud Vision API with high spatial precision.
-    Maintains correct reading order, preserves question-option relationships,
-    detects diagrams, and injects inline [DIAGRAM: ...] visual descriptions.
+    Extract text, math, and diagram descriptions from a scanned past paper page using Gemini 1.5 Flash.
+    Uses Google AI Studio free tier (no credit card or billing required).
     """
-    api_key = os.getenv("CLOUD_VISION_API_KEY") or os.getenv("GEMINI_API_KEY")
-
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("CLOUD_VISION_API_KEY")
     if not api_key:
-        raise ValueError("CLOUD_VISION_API_KEY or GEMINI_API_KEY is not set")
+        raise ValueError("GEMINI_API_KEY is not set in environment or .env")
 
     image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+    models = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]
 
-    url = (
-        "https://vision.googleapis.com/v1/images:annotate"
-        f"?key={api_key}"
+    prompt = (
+        f"You are an expert OCR and exam paper digitization engine. "
+        f"Extract all content from Page {page_number} of this past paper with high spatial precision:\n\n"
+        "1. Maintain correct reading order (if multi-column, read column 1 top-to-bottom first, then column 2).\n"
+        "2. Preserve all question numbers clearly (e.g. '1.', '2.', '23.') and sub-questions (e.g. '(a)', '(b)', '(i)').\n"
+        "3. Preserve all multiple choice options on separate lines (e.g. '(1)', '(2)', '(3)', '(4)').\n"
+        "4. Convert mathematical, physics, and chemical formulas into clean LaTeX ($...$).\n"
+        "5. If there is a diagram, chart, circuit, apparatus, or biological figure, insert an inline description block:\n"
+        "   [DIAGRAM: Question X - detailed description of what is shown, labels, forces, directions, values, and units]\n"
+        "6. Do not omit any text, numbers, or units. Output only the extracted markdown."
     )
 
     payload = {
-        "requests": [
+        "contents": [
             {
-                "image": {
-                    "content": image_base64
-                },
-                "features": [
+                "parts": [
                     {
-                        "type": "DOCUMENT_TEXT_DETECTION"
+                        "inline_data": {
+                            "mime_type": "image/png",
+                            "data": image_base64
+                        }
+                    },
+                    {
+                        "text": prompt
                     }
                 ]
             }
-        ]
+        ],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 4096,
+        }
     }
 
-    import time
-    max_retries = 5
+    max_retries = 3
     retry_delay = 2
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(
-                url,
-                json=payload,
-                timeout=60
-            )
-            response.raise_for_status()
-            result = response.json()
-            response_data = result["responses"][0]
-            break
-        except Exception as e:
-            if attempt == max_retries - 1:
-                raise e
-            print(f"Vision API request failed (attempt {attempt+1}/{max_retries}): {e}. Retrying in {retry_delay}s...")
-            time.sleep(retry_delay)
-            retry_delay *= 2
 
-    pages = response_data.get("fullTextAnnotation", {}).get("pages", [])
-    vision_width = pages[0].get("width", 1) if pages else 1
-    vision_height = pages[0].get("height", 1) if pages else 1
-    page_rect = page.rect
-    scale_y_pt = page_rect.height / vision_height if vision_height > 0 else 1.0
-
-    paragraphs_list = []
-    for page_obj in pages:
-        p_width = page_obj.get("width", 0)
-        p_height = page_obj.get("height", 0)
-        for block in page_obj.get("blocks", []):
-            for paragraph in block.get("paragraphs", []):
-                words_data = []
-                for word in paragraph.get("words", []):
-                    word_text = "".join(symbol.get("text", "") for symbol in word.get("symbols", []))
-                    vertices = word.get("boundingBox", {}).get("vertices", [])
-                    if vertices:
-                        xs = [v.get("x", 0) for v in vertices]
-                        ys = [v.get("y", 0) for v in vertices]
-                        words_data.append({
-                            "text": word_text,
-                            "min_x": min(xs),
-                            "max_x": max(xs),
-                            "min_y": min(ys),
-                            "max_y": max(ys)
-                        })
-
-                if not words_data:
+    for model_name in models:
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model_name}:generateContent?key={api_key}"
+        )
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(url, json=payload, timeout=45)
+                if response.status_code == 429:
+                    # Rate limit (15 req/min on free tier) - wait and retry
+                    time.sleep(4)
                     continue
+                if response.status_code == 404:
+                    # Model deprecated or unavailable, try next model in list
+                    break
+                response.raise_for_status()
+                result = response.json()
+                candidates = result.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    text = "".join(p.get("text", "") for p in parts).strip()
+                    if text:
+                        return text
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    print(f"Gemini OCR attempt failed for model {model_name} on page {page_number}: {e}")
+                time.sleep(retry_delay)
+                retry_delay *= 2
 
-                # Split word sequences on clear boundary points (e.g. Question starts: "23.", "(1)", "Part A")
-                split_indices = []
-                for idx, w in enumerate(words_data):
-                    if idx == 0:
-                        continue
-                    is_split_point = False
+    return ""
 
-                    # Question number start: "23.", "1.", "40."
-                    if re.match(r"^\d+\.$", w["text"]):
-                        is_split_point = True
-                    elif re.match(r"^\d+$", w["text"]) and idx + 1 < len(words_data) and words_data[idx+1]["text"] == ".":
-                        is_split_point = True
-                    # MCQ Option start: "(1)", "(2)", "(3)", "(4)"
-                    elif w["text"] == "(" and idx + 2 < len(words_data):
-                        next_w = words_data[idx + 1]["text"]
-                        after_w = words_data[idx + 2]["text"]
-                        if re.match(r"^[1-4]$", next_w) and after_w == ")":
-                            is_split_point = True
-                    elif re.match(r"^\([1-4]\)$", w["text"]):
-                        is_split_point = True
-                    # Section Header start: "Part A", "Part B"
-                    elif w["text"] in {"Part", "PART"} and idx + 1 < len(words_data):
-                        next_w = words_data[idx + 1]["text"]
-                        if next_w in {"A", "B", "(A)", "(B)", "-A", "-B"}:
-                            is_split_point = True
 
-                    if is_split_point:
-                        split_indices.append(idx)
-
-                last_idx = 0
-                parts = []
-                for split_idx in split_indices:
-                    parts.append(words_data[last_idx:split_idx])
-                    last_idx = split_idx
-                parts.append(words_data[last_idx:])
-
-                for part in parts:
-                    if not part:
-                        continue
-                    text = " ".join(w["text"] for w in part)
-
-                    min_x = min(w["min_x"] for w in part)
-                    max_x = max(w["max_x"] for w in part)
-                    min_y = min(w["min_y"] for w in part)
-                    max_y = max(w["max_y"] for w in part)
-
-                    if is_metadata_or_footer(text, min_x, max_x, min_y, max_y, p_width, p_height):
-                        continue
-
-                    paragraphs_list.append({
-                        "text": text,
-                        "min_x": min_x,
-                        "max_x": max_x,
-                        "min_y": min_y,
-                        "max_y": max_y,
-                        "mid_y": (min_y + max_y) / 2,
-                        "mid_x": (min_x + max_x) / 2
-                    })
-
-    # Sort paragraphs primarily by vertical reading band, then horizontally
-    # Group paragraphs into horizontal bands within ~18 pixels
-    paragraphs_list.sort(key=lambda p: p["mid_y"])
-
-    lines_output = []
-    current_q_num = None
-    current_q_stem = ""
-    current_q_stem_y = 0
-
-    for p in paragraphs_list:
-        text_stripped = p["text"].strip()
-
-        # Check if paragraph starts a new question e.g. "23. Some plants..."
-        q_match = re.match(r"^(\d+)\s*\.\s*(.*)", text_stripped)
-        if q_match:
-            new_q_num = int(q_match.group(1))
-            new_q_rest = q_match.group(2)
-
-            # Detect diagram in previous question if needed
-            current_q_num = new_q_num
-            current_q_stem = text_stripped
-            current_q_stem_y = p["min_y"]
-
-            lines_output.append(text_stripped)
-
-            # Check if this question stem has a diagram keyword
-            if DIAGRAM_KEYWORDS.search(text_stripped):
-                top_pt = max(0, current_q_stem_y * scale_y_pt)
-                bottom_pt = min(page_rect.height, (current_q_stem_y + 120) * scale_y_pt)
-                clip_rect = pymupdf.Rect(
-                    page_rect.width * 0.03,
-                    top_pt,
-                    page_rect.width * 0.97,
-                    bottom_pt
-                )
-
-                diag_tag = None
-                if clip_rect.height > 15:
-                    try:
-                        cropped_pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), clip=clip_rect)
-                        gemini_desc = describe_diagram_bytes(cropped_pix.tobytes("png"), new_q_num)
-                        if gemini_desc:
-                            diag_tag = f"[DIAGRAM: {gemini_desc}]"
-                    except Exception:
-                        pass
-
-                if not diag_tag:
-                    synthesized = synthesize_diagram_explanation(new_q_num, text_stripped, [])
-                    diag_tag = f"[DIAGRAM: {synthesized}]"
-
-                lines_output.append(diag_tag)
-
-        else:
-            # Regular paragraph, option (1)-(4), or diagram label
-            lines_output.append(text_stripped)
-
-    return "\n".join(lines_output)
+def extract_text_with_vision(image_bytes: bytes, page: pymupdf.Page = None) -> str:
+    """
+    Backward-compatible wrapper redirecting to Gemini OCR.
+    """
+    page_num = (page.number + 1) if (page is not None and hasattr(page, "number")) else 1
+    return extract_text_with_gemini(image_bytes, page_number=page_num)
 
 
 def load_pdf(file_path: str) -> str:
-
     document = pymupdf.open(file_path)
-
+    total_pages = len(document)
     text_parts = []
 
     for page_number, page in enumerate(document, start=1):
+        print(f"Processing page {page_number}/{total_pages} with Gemini 1.5 Flash...")
 
-        print(f"Processing page {page_number}...")
-
-        # Convert page to image for Vision API
-        pixmap = page.get_pixmap(
-            matrix=pymupdf.Matrix(2, 2)
-        )
-
+        # Convert page to image (scale 2x for high quality OCR)
+        pixmap = page.get_pixmap(matrix=pymupdf.Matrix(2, 2))
         image_bytes = pixmap.tobytes("png")
 
-        # OCR using Google Vision + Diagram descriptions, with PyMuPDF direct text fallback
+        # OCR using Gemini 1.5 Flash, with PyMuPDF direct text fallback
+        page_text = ""
         try:
-            page_text = extract_text_with_vision(image_bytes, page)
+            page_text = extract_text_with_gemini(image_bytes, page_number)
+            # Sleep 4 seconds between pages to stay comfortably within 15 req/min free tier
+            if page_number < total_pages:
+                time.sleep(4)
         except Exception as e:
-            print(f"Vision API extraction failed for page {page_number}: {e}. Falling back to PyMuPDF direct text extraction.")
+            print(f"Gemini OCR failed for page {page_number}: {e}. Falling back to PyMuPDF direct text extraction.")
+
+        if not page_text or not page_text.strip():
             page_text = page.get_text().strip()
 
         text_parts.append(
@@ -398,5 +288,4 @@ def load_pdf(file_path: str) -> str:
         )
 
     document.close()
-
     return "\n".join(text_parts)
