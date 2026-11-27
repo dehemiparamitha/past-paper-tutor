@@ -10,6 +10,6 @@ text = load_pdf("data/past_papers/2025.pdf")
 
 print(text[:5000])
 
-with open("extracted_text_2015.txt", "w", encoding="utf-8") as f:
+with open("extracted_text_2025.txt", "w", encoding="utf-8") as f:
     f.write(text)
-print("\nFull text saved to extracted_text_2015.txt")
+print("\nFull text saved to extracted_text_2025.txt")
